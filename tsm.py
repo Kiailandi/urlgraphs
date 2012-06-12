@@ -89,8 +89,6 @@ class TuristiPerCasoForum(object):
 
             #&lt;a href=&quot;http://viaggiareconibambini.blogspot.com/search/label/Alto%20Adige&quot;
             for forum_text in content.find_all('div', {'class': 'forum_text'}):
-    #            pdb.set_trace()
-
                 # find escaped links in text
                 text = forum_text.text
                 for found_url in self.unescape_and_iter(text):
