@@ -75,11 +75,10 @@ class TuristiPerCaso(Parser):
         pass
 
 
-class VBullettin_Section(Parser):
+class VBulletin_Section(Parser):
     """
 
 ----------------------------- Section ---------------------------------
-
 
     # http://www.ilgiramondo.net/forum/trentino-alto-adige/
 
@@ -87,43 +86,47 @@ class VBullettin_Section(Parser):
     <a class="title" href="http://www.ilgiramondo.net/forum/trentino-alto-adige/21531-trentino-alto-adige-renon.html" id="thread_title_21531">Trentino Alto Adige - Renon</a>
 
     # Paginetion Topic
-
-    <dl class="pagination" id="pagination_threadbit_15753">
-                                <dt class="label">25 Pagine <span class="separator">&bull;</span></dt>
-                                <dd>
-                                    <span class="pagelinks">
-                                         <span><a href="http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html">1</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-2/trentino-alto-adige/15753-trentino-alto-adige.html">2</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-3/trentino-alto-adige/15753-trentino-alto-adige.html">3</a></span>
-                                         ... <a href="http://www.ilgiramondo.net/forum/page-25/trentino-alto-adige/15753-trentino-alto-adige.html">25</a>
-                                    </span>
-                                </dd>
-                            </dl>
+    <div id="threadlist" class="threadlist">
+        < > ... < >
+            <dl class="pagination" id="pagination_threadbit_15753">
+                <dt class="label">25 Pagine <span class="separator">&bull;</span></dt>
+                        <dd>
+                            <span class="pagelinks">
+                                 <span><a href="http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html">1</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-2/trentino-alto-adige/15753-trentino-alto-adige.html">2</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-3/trentino-alto-adige/15753-trentino-alto-adige.html">3</a></span>
+                                      ... <a href="http://www.ilgiramondo.net/forum/page-25/trentino-alto-adige/15753-trentino-alto-adige.html">25</a>
+                                </span>
+                            </dd>
+                     </dl>
+        < > ... < >
+    </div>
     """
 
     def match(self, url):
+#   found if is a VBulletin section
         page = get(url)
         section_soup = BeautifulSoup(page, "lxml")
-        html = section_soup.find(html)
+        html = section_soup.find('html')
         f_section = section_soup.find('div',{"id":"threadlist"},{"class":"threadlist"})
         if html.get('id') == 'vbulletin_html' and f_section is not None:
             return True
 
         return False
 
-        return False
-
     def found_topic_url(self, div):
+#   found by how many topic is composed the forum section
         for topic in div.find_all('a', {"class": "title"}):
             yield topic.get('href')
 
     def found_pagination(self,div):
+#   found if is use a pagination for the topic
         for page in div.find_all('span', {"class": "pagelinks"}): #<span class="pagelinks">
             for url_topic in page.find_all('a'):
                 yield url_topic.get('href')
 
     def run(self,url):
-        print 'Applico i criteri di vBulletin_Section'
+        print 'Applico criteri vBulletin_Section'
         page = get(url)
-        text_soup = BeautifulSoup(page, "lxml") # get page
+        text_soup = BeautifulSoup(page, "lxml")
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
         for div in div_lists:
             cnt = 0
@@ -137,8 +140,8 @@ class VBullettin_Section(Parser):
 
 
 class VBulletin_Topic(Parser):
-    """
-    ----------------------------- Topic ---------------------------------
+    """ ----------------------------- Topic ---------------------------------
+    <div id="postlist" class="postlist">
 
     Page 1: http://www.ilgiramondo.net/forum/trentino-alto-adige/6669-trentino-alto-adige-quale-localita.html
     Page 2: http://www.ilgiramondo.net/forum/page-2/trentino-alto-adige/6669-trentino-alto-adige-quale-localita.html
@@ -150,36 +153,47 @@ class VBulletin_Topic(Parser):
     <!-- google_ad_section_start -->Io sono stata a Levico Terme a Natale .. c'erano i mercatini, ma mi sembrava carino anche per l'estate.<br />
 Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la piscina e la sauna nell'hotel.<br />
 <a onclick="_gaq.push(['_trackEvent', 'Outgoing', 'www.eden-hotel.com', '']);" rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.com</a><!-- google_ad_section_end --><!-- GAL -->
-</div>
+    </div>
 </div>
 
-# Notice '><!-- google_ad_section_start -->'             '<!-- google_ad_section_end --><!-- GAL -->'
-
+# Notice: '><!-- google_ad_section_start -->'             '<!-- google_ad_section_end --><!-- GAL -->'
     """
 
     def match(self, url):
+#   found if is a VBulletin topic
         page = get(url)
         topic_soup = BeautifulSoup(page, "lxml")
-        html = topic_soup.find(html)
+        html = topic_soup.find('html')
         f_topic = topic_soup.find('div',{"id":"postlist"},{"class":"postlist restrain"})
         if html.get('id') == 'vbulletin_html' and f_topic is not None:
             return True
 
         return False
 
-    def url_message(self,div):
-        for page in div.find_all('span', {"class": "pagelinks"}): #<span class="pagelinks">
-            for url_topic in page.find_all('a'):
-                yield url_topic.get('href')
+    def found_pages(self, text_soup):
+#   found by how many pages is composed the topic
+#   <div id="pagination_top" class="pagination_top">
+        div_lists = text_soup.find('div', {'id':'pagination_top'}, {'class':'pagination_top'})
+        for a in div_lists.find_all('a'):
+            if a.get('href'):
+                yield a.get('href')
 
-    def run(self,url):
-        print 'Applico i criteri di vBulletin_Topic'
-        page = get(url)
-        text_soup = BeautifulSoup(page, "lxml") # get page
+    def messages_url(self,text_soup):
+#   found URL in users' messages
         div_lists = text_soup.find_all('div', {"class": "content"}) # type list
         for div in div_lists:
             for a in div.find_all('a'):
-                yield a.get('href')
+                if a.get('href'):
+                    yield a.get('href')
+
+    def run(self,url):
+        print 'Applico criteri di vBulletin_Topic'
+        page = get(url)
+        text_soup = BeautifulSoup(page, "lxml")
+        for page_link in self.messages_url(text_soup):
+            yield page_link
+        for pages in self.found_pages(text_soup):
+            yield pages
 
 
 class Generic_link(Parser):
@@ -189,6 +203,7 @@ class Generic_link(Parser):
 
     # list of link by diffbot
     def run(self, URL):
+        print 'Applico criteri Diffbot'
         self.URL = URL
         xmlanswer = get(defpath, params=dict(token=s_token, url=URL))
         doc = etree.fromstring(xmlanswer.encode('utf-8'))
@@ -268,6 +283,7 @@ def clear_site(url):
     s = urlparse(url)
 
     if s.query == '':
+#        print url, s.scheme, s.hostname, s.path
         site = s.scheme + '://' + s.hostname + s.path
     else:
         site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
@@ -277,15 +293,30 @@ def clear_site(url):
 
 def is_valid(url):
     """
-    function for found if  an url is valid for the research
+    function for found if an url is valid for the research
 
-    idfoto:     http://www.ilturista.info/ugc/foto_viaggi_vacanze/228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
-    immagini:   http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
+    javascript://       javascript://
+    www.google.it       scheme:""   path:"www.google.it"
+    idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
+    immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
+
     """
-    s = urlparse(url)
+    if (url == 'javascript://'):
+        return False
 
+    s = urlparse(url)
     s_path = s.path.lower()
     s_query = s.query.lower()
+
+    # try (don't sure if this section is utilizable)
+    try:
+        if s.scheme.find('mailto') != -1:
+            return False
+    except:
+        pass
+
+    if s.hostname is None and s.path is None:
+        return False
 
     if s_path.find('immagini') != -1:
         return False
@@ -314,8 +345,8 @@ if __name__ == "__main__":
 
     # class define
     defSite = DefSites()
-    defSite.register(VBullettin_Section())
-    defSite.register(VBullettin_Topic())
+    defSite.register(VBulletin_Section())
+    defSite.register(VBulletin_Topic())
     defSite.register(TuristiPerCaso())
     defSite.register(Generic_link())
 
@@ -356,8 +387,8 @@ if __name__ == "__main__":
                     stringURL = url
 
                 for found_url in parser.run(url):
-                    found_url = clear_site(found_url)
                     if is_valid(found_url):
+                        found_url = clear_site(found_url)
                         if number_site(found_url) == len(siteslist) - 1 and current_depth < depthRoot:
                             jobs[current_depth + 1].append(found_url)
 
