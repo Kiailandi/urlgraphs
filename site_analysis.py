@@ -219,12 +219,12 @@ class Generic_link(Parser):
         return True
 
     # list of link by diffbot
-    def run(self, URL):
+    def run(self, url):
         logging.info('Run Diffbot on site: %s', url)
         print 'Applico criteri Diffbot'
-        self.URL = URL
+        self.URL = url
         try:
-            xmlanswer = get(defpath, params=dict(token=s_token, url=URL))
+            xmlanswer = get(defpath, params=dict(token=s_token, url=url))
             print xmlanswer
             doc = etree.fromstring(xmlanswer.encode('utf-8'))
             for link in doc.iterfind('.//link'):
@@ -334,7 +334,7 @@ def is_valid(url):
     immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
 
     """
-    logging.info('Url validation: %s',url)
+    logging.info('Url validation: %s', url)
 
     if url == 'javascript://':
         return False
@@ -360,6 +360,12 @@ def is_valid(url):
 
     try:
         get(url)
+
+    except requests.exceptions.ConnectionError:
+        print 'Server non raggiungibile o inesistente'
+        logging.info('Server unreachable or nonexistent: %s', url)
+        return False
+
     except requests.exceptions.Timeout:
         print 'Il server sta impiegando troppo tempo per la risposta, salto il link'
         logging.info('Timeout link: %s', url)

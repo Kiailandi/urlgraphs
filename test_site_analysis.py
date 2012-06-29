@@ -54,9 +54,10 @@ class TestMyModule(unittest.TestCase):
 
    def test_is_valid(self):
        from site_analysis import is_valid
-       self.assertTrue(is_valid('http://wwww.miosito.com/path.html'))
-       self.assertFalse(is_valid('http://wwww.miosito.com/path.html?idfoto=0001'))
-       self.assertFalse(is_valid('http://wwww.miosito.com/immagini/path.html'))
+       self.assertTrue(is_valid('http://it.wikipedia.org/wiki/Python/'))
+       self.assertFalse(is_valid('http://www.ilturista.info/ugc/foto_viaggi_vacanze/455-Le_cascate_piu_belle_grandi_o_spettacolari_del_mondo/?idfoto=8704'))
+       self.assertFalse(is_valid('http://www.ilturista.info/ugc/immagini/giordania/asia/1822/'))
+       self.assertFalse(is_valid('http://ghadguhi.com/'))
 
    def test_VBulletin_Topic(self):
        from site_analysis import VBulletin_Topic
