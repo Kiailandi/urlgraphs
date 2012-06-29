@@ -224,13 +224,15 @@ class Generic_link(Parser):
         print 'Applico criteri Diffbot'
         self.URL = url
         try:
-            xmlanswer = get(defpath, params=dict(token=s_token, url=url))
-            print xmlanswer
-            doc = etree.fromstring(xmlanswer.encode('utf-8'))
-            for link in doc.iterfind('.//link'):
-                yield link.text.strip()
+            xmlanswer = get(defpath,60, params=dict(token=s_token, url=url))
         except requests.exceptions.Timeout:
             print 'Diffbot sta impiegando troppo tempo per la risposta, salto il link'
+            return
+
+        doc = etree.fromstring(xmlanswer.encode('utf-8'))
+        for link in doc.iterfind('.//link'):
+            yield link.text.strip()
+
 
 # ----------------------------------
 
@@ -240,7 +242,7 @@ def gen_hash(*args, **kwargs):
     import cPickle as pickle
     return str(abs(hash(pickle.dumps((args, kwargs)))))
 
-def get(url, **kwargs):
+def get(url, timeout=30, **kwargs):
     logging.info('Getting url %s', url)
     # hash request
     hash_ = gen_hash(url, kwargs)
@@ -255,8 +257,8 @@ def get(url, **kwargs):
         pass
 
     logging.info('Not in cache: %s', url)
-    text = requests.get(url, timeout=30, **kwargs).text
-
+    text = requests.get(url, timeout, **kwargs).text
+    text = requests.get(url, **kwargs).text
     # store in cache
     with BZ2File(filename, 'wb') as f:
         f.write(text.encode('utf-8'))
@@ -389,7 +391,7 @@ s_token = '22df3421e2ecce206e95c4e68b44b9aa'
 
 if __name__ == "__main__":
     print '\r'
-    print 'Avvio programma Analisi v0.1'
+    print 'Avvio programma Analisi v0.1.1'
     print '\r'
 
     # class define
@@ -416,8 +418,9 @@ if __name__ == "__main__":
         url = url.strip()
         if not url:
             continue
-        siteslist.append(clear_site(url))
-        jobs[1].append(clear_site(url))
+        if is_valid(url):
+            siteslist.append(clear_site(url))
+            jobs[1].append(clear_site(url))
 
     current_depth = 1
 
