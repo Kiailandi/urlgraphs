@@ -1,6 +1,7 @@
 import requests
 import re
 import os
+import logging
 from xml.etree import cElementTree as etree
 from collections import defaultdict
 from optparse import OptionParser
@@ -9,9 +10,13 @@ from bz2 import BZ2File
 from bs4 import BeautifulSoup
 
 
+logging.basicConfig(level=logging.WARNING)
+
+
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
+
 
 try:
     os.mkdir(CACHE_PATH)
@@ -225,19 +230,23 @@ def gen_hash(*args, **kwargs):
     return str(abs(hash(pickle.dumps((args, kwargs)))))
 
 def get(url, **kwargs):
-# hash site
+    logging.info('Getting url %s', url)
 
+    # hash request
     hash_ = gen_hash(url, kwargs)
     filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
 
     # search in cache
     try:
         with BZ2File(filename, 'rb') as f:
+            logging.info('Found in cache: %s', url)
             return f.read().decode('utf-8')
     except IOError:
         pass
 
-    text = requests.get(url, **kwargs).text
+    logging.info('Not in cache: %s', url)
+
+    text = requests.get(url, timeout=30., **kwargs).text
 
     # store in cache
     with BZ2File(filename, 'wb') as f:
@@ -314,7 +323,7 @@ def is_valid(url):
     immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
 
     """
-    if (url == 'javascript://'):
+    if url == 'javascript://':
         return False
 
     s = urlparse(url)
@@ -376,9 +385,12 @@ if __name__ == "__main__":
     jobs = defaultdict(list)
 
     #  siteslist's inizialization
-    for i in range(len(temp)):
-        siteslist.append(clear_site(temp[i].strip()))
-        jobs[1].append(clear_site(temp[i].strip()))
+    for url in temp:
+        url = url.strip()
+        if not url:
+            continue
+        siteslist.append(clear_site(url))
+        jobs[1].append(clear_site(url))
 
     current_depth = 1
 
