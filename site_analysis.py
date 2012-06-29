@@ -382,9 +382,13 @@ if __name__ == "__main__":
                     break
 
                 if writepath is not None:
-                    stringURL = 'N{0}'.format(number_site(url))
+                    if aliasLocation is not None:
+                        stringURL = 'N{0}'.format(number_site(url))
+                    else:
+                         stringURL = url
                 else:
-                    stringURL = url
+                    print '\r'
+                    stringURL = url + '\r\n'
 
                 for found_url in parser.run(url):
                     if is_valid(found_url):
@@ -393,13 +397,15 @@ if __name__ == "__main__":
                             jobs[current_depth + 1].append(found_url)
 
                         if writepath is not None:
-                            stringURL = stringURL + "  " + 'N{0}'.format(number_site(found_url))
+                            if aliasLocation is not None:
+                                stringURL = stringURL + "  " + 'N{0}'.format(number_site(found_url))
+                            else:
+                                stringURL = stringURL + "     " + found_url
                         else:
-                            stringURL = stringURL + "     " + found_url
+                            stringURL = stringURL + "     " + found_url + '\r\n'
 
                 if writepath is None:
                     print stringURL
-                    print '\r'
 
                 else:
                     file.write_on_file(stringURL)
@@ -413,7 +419,7 @@ if __name__ == "__main__":
         if not len(jobs[current_depth]):
             break
 
-    if aliasLocation is not None:
+    if aliasLocation is not None and writepath is not None:
         print 'Scrittura alias'
         file.write_alias()
 
