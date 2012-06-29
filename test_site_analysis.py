@@ -50,7 +50,7 @@ class TestMyModule(unittest.TestCase):
        from site_analysis import gen_hash
        #self.assertEqual(gen_hash('http://www.diffbot.com/',dict(p1='p1', p2='p2')),'1905959970210950507')
        # insetrt new hash
-       self.assertEqual(gen_hash('http://www.diffbot.com/',dict(p1='p1', p2='p2')),'1534481045')
+       self.assertEqual(gen_hash('http://www.diffbot.com/',dict(p1='p1', p2='p2')),gen_hash('http://www.diffbot.com/',dict(p1='p1', p2='p2')))
 
    def test_is_valid(self):
        from site_analysis import is_valid

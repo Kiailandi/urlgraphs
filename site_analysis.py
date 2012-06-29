@@ -9,14 +9,12 @@ from urlparse import urlparse
 from bz2 import BZ2File
 from bs4 import BeautifulSoup
 
-
+# logging level initialization
 logging.basicConfig(level=logging.WARNING)
-
 
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
-
 
 try:
     os.mkdir(CACHE_PATH)
@@ -27,17 +25,20 @@ class File(object):
     # load and save input_file, save_file, alias_file
 
     def load_file(self):
+        logging.info('Open read file from path: %s', readpath)
         file = open(readpath, 'r')
         s = file.readlines()
         file.close()
         return s
 
     def write_on_file(self, string):
+        logging.info('Write on file, path: %s', writepath)
         file = open(writepath, 'a')
         file.writelines(string)
         file.close()
 
     def write_alias(self):
+        logging.info('Write alias file, path: %s', readpath)
         os.remove(aliasLocation)
         file = open(aliasLocation, 'a')
         for i in range(len(siteslist)):
@@ -52,6 +53,7 @@ class DefSites(object):
         self.urlDefRegistry = []
 
     def register(self, parser):
+        logging.info('Register Parser: %s', parser)
         assert isinstance(parser, Parser), "Mi aspettavo un parser, mi hai passato un {0}".format(type(parser))
         self.urlDefRegistry.append(parser)
 
@@ -108,15 +110,16 @@ class VBulletin_Section(Parser):
 
     def match(self, url):
 #   found if is a VBulletin section
+        logging.info('Check VBulletin section rules of the site: %s', url)
         page = get(url)
         section_soup = BeautifulSoup(page, "lxml")
         html = section_soup.find('html')
         f_section = section_soup.find('div',{"id":"threadlist"},{"class":"threadlist"})
-        try: # is possible html.get('id') == None
-            if html.get('id') == 'vbulletin_html' and f_section is not None:
-                return True
-        except:
-                return False
+#        try: # is possible html.get('id') == None
+        if html.get('id') == 'vbulletin_html' and f_section is not None:
+            return True
+#        except:
+#                return False
 
         return False
 
@@ -132,6 +135,7 @@ class VBulletin_Section(Parser):
                 yield url_topic.get('href')
 
     def run(self,url):
+        logging.info('Run VBulletin section rules of the site: %s', url)
         print 'Applico criteri vBulletin_Section'
         page = get(url)
         text_soup = BeautifulSoup(page, "lxml")
@@ -169,15 +173,16 @@ Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la p
 
     def match(self, url):
 #   found if is a VBulletin topic
+        logging.info('Check VBulletin topic rules of the site: %s', url)
         page = get(url)
         topic_soup = BeautifulSoup(page, "lxml")
         html = topic_soup.find('html')
         f_topic = topic_soup.find('div',{"id":"postlist"},{"class":"postlist restrain"})
-        try: # is possible html.get('id') == None
-            if html.get('id') == 'vbulletin_html' and f_topic is not None:
-                return True
-        except:
-            return False
+#        try: # is possible html.get('id') == None
+        if html.get('id') == 'vbulletin_html' and f_topic is not None:
+            return True
+#        except:
+#            return False
 
         return False
 
@@ -198,6 +203,7 @@ Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la p
                     yield a.get('href')
 
     def run(self,url):
+        logging.info('Run VBulletin section rules of the site: %s', url)
         print 'Applico criteri di vBulletin_Topic'
         page = get(url)
         text_soup = BeautifulSoup(page, "lxml")
@@ -214,12 +220,17 @@ class Generic_link(Parser):
 
     # list of link by diffbot
     def run(self, URL):
+        logging.info('Run Diffbot on site: %s', url)
         print 'Applico criteri Diffbot'
         self.URL = URL
-        xmlanswer = get(defpath, params=dict(token=s_token, url=URL))
-        doc = etree.fromstring(xmlanswer.encode('utf-8'))
-        for link in doc.iterfind('.//link'):
-            yield link.text.strip()
+        try:
+            xmlanswer = get(defpath, params=dict(token=s_token, url=URL))
+            print xmlanswer
+            doc = etree.fromstring(xmlanswer.encode('utf-8'))
+            for link in doc.iterfind('.//link'):
+                yield link.text.strip()
+        except requests.exceptions.Timeout:
+            print 'Diffbot sta impiegando troppo tempo per la risposta, salto il link'
 
 # ----------------------------------
 
@@ -231,7 +242,6 @@ def gen_hash(*args, **kwargs):
 
 def get(url, **kwargs):
     logging.info('Getting url %s', url)
-
     # hash request
     hash_ = gen_hash(url, kwargs)
     filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
@@ -245,8 +255,7 @@ def get(url, **kwargs):
         pass
 
     logging.info('Not in cache: %s', url)
-
-    text = requests.get(url, timeout=30., **kwargs).text
+    text = requests.get(url, timeout=30, **kwargs).text
 
     # store in cache
     with BZ2File(filename, 'wb') as f:
@@ -268,6 +277,7 @@ def option_parser():
         help="Location of file where save the alias-data", metavar="alias-location")
 
     (options, args) = parser_.parse_args()
+    logging.info('Params: depth= %d, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias, args[0])
 
     # check option (depth)
     if options.depth is None or options.depth <= 0:
@@ -275,6 +285,7 @@ def option_parser():
     else:
         depthRoot = int(options.depth)
     #
+
     writepath = options.output
     aliasLocation = options.alias
     readpath = args[0]
@@ -282,11 +293,11 @@ def option_parser():
     return depthRoot, writepath, readpath, aliasLocation
 
 def number_site(url):
-
     """
     return the index of the 'url' in the sites_list
     if doesn't exists add him
     """
+    logging.info('Check number for url: %s',url)
     try:
         return siteslist.index(url)
     except ValueError:
@@ -298,17 +309,17 @@ def clear_site(url):
     s = urlparse(url)
 
 #    print url, s.scheme, s.hostname, s.path
-
+    logging.info('urlparse: %s',s)
     if s.query == '':
         try:
             site = s.scheme + '://' + s.hostname + s.path
-        except:
-            site = 'http://www.'+ s.path
+        except TypeError:
+            site = 'http://'+ s.path
     else:
         try:
             site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
-        except:
-            site = 'http://www.'+ s.path + '?' + s.query
+        except TypeError:
+            site = 'http://'+ s.path + '?' + s.query
 
     return site
 
@@ -323,6 +334,8 @@ def is_valid(url):
     immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
 
     """
+    logging.info('Url validation: %s',url)
+
     if url == 'javascript://':
         return False
 
@@ -331,11 +344,11 @@ def is_valid(url):
     s_query = s.query.lower()
 
     # try (don't sure if this section is utilizable)
-    try:
-        if s.scheme.find('mailto') != -1:
-            return False
-    except:
-        pass
+#    try:
+    if s.scheme.find('mailto') != -1:
+        return False
+#    except: AttributeError
+#        pass
 
     if s.hostname is None and s.path is None:
         return False
@@ -344,6 +357,14 @@ def is_valid(url):
         return False
     if s_query.find('idfoto') != -1:
         return False
+
+    try:
+        get(url)
+    except requests.exceptions.Timeout:
+        print 'Il server sta impiegando troppo tempo per la risposta, salto il link'
+        logging.info('Timeout link: %s', url)
+        return False
+
 
     return True
 
@@ -417,6 +438,7 @@ if __name__ == "__main__":
 
                 for found_url in parser.run(url):
                     if is_valid(found_url):
+                        logging.info('found_url: %s',found_url)
                         found_url = clear_site(found_url)
                         if number_site(found_url) == len(siteslist) - 1 and current_depth < depthRoot:
                             jobs[current_depth + 1].append(found_url)
