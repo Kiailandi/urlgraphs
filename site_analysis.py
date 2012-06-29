@@ -107,8 +107,11 @@ class VBulletin_Section(Parser):
         section_soup = BeautifulSoup(page, "lxml")
         html = section_soup.find('html')
         f_section = section_soup.find('div',{"id":"threadlist"},{"class":"threadlist"})
-        if html.get('id') == 'vbulletin_html' and f_section is not None:
-            return True
+        try: # is possible html.get('id') == None
+            if html.get('id') == 'vbulletin_html' and f_section is not None:
+                return True
+        except:
+                return False
 
         return False
 
@@ -165,8 +168,11 @@ Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la p
         topic_soup = BeautifulSoup(page, "lxml")
         html = topic_soup.find('html')
         f_topic = topic_soup.find('div',{"id":"postlist"},{"class":"postlist restrain"})
-        if html.get('id') == 'vbulletin_html' and f_topic is not None:
-            return True
+        try: # is possible html.get('id') == None
+            if html.get('id') == 'vbulletin_html' and f_topic is not None:
+                return True
+        except:
+            return False
 
         return False
 
@@ -282,11 +288,18 @@ def clear_site(url):
     # formatting and clearing url
     s = urlparse(url)
 
+#    print url, s.scheme, s.hostname, s.path
+
     if s.query == '':
-#        print url, s.scheme, s.hostname, s.path
-        site = s.scheme + '://' + s.hostname + s.path
+        try:
+            site = s.scheme + '://' + s.hostname + s.path
+        except:
+            site = 'http://www.'+ s.path
     else:
-        site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
+        try:
+            site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
+        except:
+            site = 'http://www.'+ s.path + '?' + s.query
 
     return site
 
