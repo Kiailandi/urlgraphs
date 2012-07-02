@@ -222,7 +222,6 @@ class Generic_link(Parser):
     def run(self, url):
         logging.info('Run Diffbot on site: %s', url)
         print 'Applico criteri Diffbot'
-        self.URL = url
         try:
             xmlanswer = get(defpath,60, params=dict(token=s_token, url=url))
         except requests.exceptions.Timeout:
@@ -355,6 +354,13 @@ def is_valid(url):
         return False
 
     if s_path.find('immagini') != -1:
+        ###### Image YES ########################
+        imagepath = '\\home\\elia\\temp\\image.txt'
+        logging.info('Write on file, path: %s', imagepath)
+        file = open(imagepath, 'a')
+        file.writelines(url)
+        file.close()
+        ######################################
         return False
     if s_query.find('idfoto') != -1:
         return False
@@ -432,8 +438,8 @@ if __name__ == "__main__":
                 print 'Analisi sito: ' + url
                 print 'Profondita\': ' + str(current_depth)
 
-                if is_valid(url) == False:
-                    break
+#                if is_valid(url) == False:
+#                    break
 
                 if writepath is not None:
                     if aliasLocation is not None:
