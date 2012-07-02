@@ -257,8 +257,7 @@ def get(url, timeout=30, **kwargs):
         pass
 
     logging.info('Not in cache: %s', url)
-    text = requests.get(url, timeout, **kwargs).text
-    text = requests.get(url, **kwargs).text
+    text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
     with BZ2File(filename, 'wb') as f:
         f.write(text.encode('utf-8'))
