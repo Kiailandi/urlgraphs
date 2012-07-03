@@ -10,7 +10,7 @@ from bz2 import BZ2File
 from bs4 import BeautifulSoup
 
 # logging level initialization
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.DEBUG)
 
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
@@ -42,7 +42,7 @@ class File(object):
         os.remove(aliasLocation)
         file = open(aliasLocation, 'a')
         for i in range(len(siteslist)):
-            file.writelines('N' + str(i) + ': ' + siteslist[i] + '\r\n')
+            file.writelines('N' + str(i) + ': ' + siteslist[i].encode('utf-8') + '\r\n')
         file.close()
 
 
@@ -227,8 +227,10 @@ class Generic_link(Parser):
         except requests.exceptions.Timeout:
             print 'Diffbot sta impiegando troppo tempo per la risposta, salto il link'
             return
-
-        doc = etree.fromstring(xmlanswer.encode('utf-8'))
+        try:
+            doc = etree.fromstring(xmlanswer.encode('utf-8'))
+        except:
+            return
         for link in doc.iterfind('.//link'):
             yield link.text.strip()
 
@@ -255,6 +257,7 @@ def get(url, timeout=30, **kwargs):
     except IOError:
         pass
 
+    print url
     logging.info('Not in cache: %s', url)
     text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
@@ -328,6 +331,7 @@ def is_valid(url):
     """
     function for found if an url is valid for the research
 
+    showthread.php      showthread.php
     javascript://       javascript://
     www.google.it       scheme:""   path:"www.google.it"
     idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
@@ -337,6 +341,9 @@ def is_valid(url):
     logging.info('Url validation: %s', url)
 
     if url == 'javascript://':
+        return False
+
+    if url.find('showthread.php') > 0:
         return False
 
     s = urlparse(url)
@@ -358,7 +365,7 @@ def is_valid(url):
         imagepath = '\\home\\elia\\temp\\image.txt'
         logging.info('Write on file, path: %s', imagepath)
         file = open(imagepath, 'a')
-        file.writelines(url)
+        file.writelines(url + '\r\n')
         file.close()
         ######################################
         return False
@@ -367,17 +374,30 @@ def is_valid(url):
 
     try:
         get(url)
-
-    except requests.exceptions.ConnectionError:
-        print 'Server non raggiungibile o inesistente'
-        logging.info('Server unreachable or nonexistent: %s', url)
+    except:
         return False
 
-    except requests.exceptions.Timeout:
-        print 'Il server sta impiegando troppo tempo per la risposta, salto il link'
-        logging.info('Timeout link: %s', url)
-        return False
-
+#    except requests.exceptions.ConnectionError:
+#        print 'Server non raggiungibile o inesistente'
+#        logging.info('Server unreachable or nonexistent: %s', url)
+#        return False
+#
+#    except requests.exceptions.Timeout:
+#        print 'Il server sta impiegando troppo tempo per la risposta, salto il link'
+#        logging.info('Timeout link: %s', url)
+#        return False
+#
+#    except UnicodeError:
+#        Fake link, or invalid extensions
+#        print 'Url non valido'
+#        logging.info('Url unacceptable: %s', url)
+#        return False
+#
+#    except TypeError:
+#        Invalid extensions
+#        print 'Url non valido'
+#        logging.info('Url unacceptable: %s', url)
+#        return False
 
     return True
 
@@ -403,7 +423,7 @@ if __name__ == "__main__":
     defSite = DefSites()
     defSite.register(VBulletin_Section())
     defSite.register(VBulletin_Topic())
-    defSite.register(TuristiPerCaso())
+#    defSite.register(TuristiPerCaso())
     defSite.register(Generic_link())
 
     depthRoot, writepath, readpath, aliasLocation = option_parser()
