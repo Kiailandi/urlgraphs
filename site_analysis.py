@@ -564,7 +564,7 @@ s_token = '22df3421e2ecce206e95c4e68b44b9aa'
 # ----------MAIN -------------
 
 if __name__ == "__main__":
-    logger.info('URL-Graphs --- START --- v1.2.5')
+    logger.info('URL-Graphs --- START --- v2.0.1')
 
     # class define
     from collections import Counter
@@ -608,9 +608,6 @@ if __name__ == "__main__":
                 logger.info('Site under analysis: %s', url)
                 logger.info('Depth: %d', current_depth)
 
-                #                if is_valid(url) == False:
-                #                    break
-
                 if aliasLocation is not None:
                     stringURL = 'N{0}'.format(number_site(url))
                 else:
@@ -632,7 +629,6 @@ if __name__ == "__main__":
                     logger.critical(stringURL)
 
                 else:
-                #                    print stringURL
                     logger.critical(stringURL)
                     file.write_on_file(stringURL)
                     file.write_on_file('\r\n')
@@ -647,9 +643,7 @@ if __name__ == "__main__":
             break
 
     if aliasLocation is not None and writepath is not None:
-    #        print 'Scrittura alias'
         logger.info('Alias writing')
         file.write_alias()
 
-    #    print 'Operazione Terminata'
     logger.info('MISSION ACCOMPLISHED')

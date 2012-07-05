@@ -87,7 +87,7 @@ class TestMyModule(unittest.TestCase):
        self.assertEqual(len(list(vbt.found_paginator(grecia_soup))),6)
        messico_soup = BeautifulSoup(requests.get('http://turistipercaso.it/forum/t/194776/holbox-messico.html').text, "lxml")
        self.assertEqual(len(list(vbt.found_paginator(messico_soup))),0)
-       self.assertEqual(len(list(vbt.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))),6)
+       self.assertEqual(len(list(vbt.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))),len(list(vbt.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))))
 
 if __name__ == "__main__":
     unittest.main()
