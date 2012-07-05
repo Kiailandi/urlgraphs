@@ -44,6 +44,10 @@ class TuristiPerCasoForum(object):
         if a.find_parent('h2'):
             return False
 
+        #login pop
+        if '?popup' in href:
+            return False
+
         # flag
         if '/forum/p/abuse/' in href:
             return False

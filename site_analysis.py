@@ -1,3 +1,4 @@
+from itertools import chain
 import requests
 import re
 import os
@@ -8,9 +9,25 @@ from optparse import OptionParser
 from urlparse import urlparse
 from bz2 import BZ2File
 from bs4 import BeautifulSoup
+#import pdb
+import HTMLParser
 
 # logging level initialization
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('debug_application')
+logger.setLevel(logging.DEBUG)
+# file handler
+fdh = logging.FileHandler('debug.log')
+fdh.setLevel(logging.DEBUG)
+file_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fdh.setFormatter(file_log_formatter)
+# console handler
+cwh = logging.StreamHandler()
+cwh.setLevel(logging.CRITICAL)
+console_warnig_formatter = logging.Formatter('%(message)s')
+cwh.setFormatter(console_warnig_formatter)
+#addHandler
+logger.addHandler(fdh)
+logger.addHandler(cwh)
 
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
@@ -25,21 +42,24 @@ class File(object):
     # load and save input_file, save_file, alias_file
 
     def load_file(self):
-        logging.info('Open read file from path: %s', readpath)
+        logger.info('Open read file from path: %s', readpath)
         file = open(readpath, 'r')
         s = file.readlines()
         file.close()
         return s
 
     def write_on_file(self, string):
-        logging.info('Write on file, path: %s', writepath)
+        logger.info('Write on file, path: %s', writepath)
         file = open(writepath, 'a')
         file.writelines(string)
         file.close()
 
     def write_alias(self):
-        logging.info('Write alias file, path: %s', readpath)
-        os.remove(aliasLocation)
+        logger.info('Write alias file, path: %s', readpath)
+        try:
+            os.remove(aliasLocation)
+        except  OSError:
+            pass
         file = open(aliasLocation, 'a')
         for i in range(len(siteslist)):
             file.writelines('N' + str(i) + ': ' + siteslist[i].encode('utf-8') + '\r\n')
@@ -53,7 +73,7 @@ class DefSites(object):
         self.urlDefRegistry = []
 
     def register(self, parser):
-        logging.info('Register Parser: %s', parser)
+        logger.info('Register Parser: %s', parser)
         assert isinstance(parser, Parser), "Mi aspettavo un parser, mi hai passato un {0}".format(type(parser))
         self.urlDefRegistry.append(parser)
 
@@ -76,10 +96,101 @@ class Parser(object):
 
 
 class TuristiPerCaso(Parser):
-    regex = re.compile('https?://www.turistipercaso.it')
+#    regex rule
+    regex = re.compile('(https?://(www.)?)?turistipercaso.it/forum/')
+    html_parser = None
 
-    def run(self, url):
-        pass
+    def __init__(self):
+        self.html_parser = HTMLParser.HTMLParser()
+
+    @staticmethod
+    def a_valid(a):
+#        rules for valid a_href URL
+        try:
+            href = a['href']
+        except KeyError:
+            return False
+
+        # remove title
+        if a.find_parent('h2'):
+            return False
+
+        #login pop
+        if '?popup' in href:
+            return False
+
+        # flag
+        if '/forum/p/abuse/' in href:
+            return False
+
+        # reply
+        if '/forum/p/edit/' in href:
+            return False
+
+        cls = a.get('class')
+        if cls and 'reply' in cls:
+            return False
+
+#        mailto
+        if href.startswith('mailto:'):
+            return False
+
+        return True
+
+    def unescape_and_iter(self, text):
+#        unescape old links
+        html = self.html_parser.unescape(text)
+        soup = BeautifulSoup(html, "lxml")
+        for a in soup.find_all('a'):
+            if self.a_valid(a):
+                yield a['href']
+
+    def found_paginator(self, text_soup):
+#        found URL pagination
+#        <div class="paginator" ... >
+        page_div = text_soup.find('div', {'class': 'paginator'})
+        if page_div is not None:
+            ol = page_div.find('ol', {'class': 'center'})
+            for url_topic in ol.find_all('a'):
+                yield 'http://turistipercaso.it' + url_topic.get('href')
+
+    def run(self, url, with_user=False):
+#        run TuristiPerCaso rules
+        logger.info('Run TuristiPerCaso rules of the site: %s', url)
+        page = get(url)
+        text_soup = BeautifulSoup(page, "lxml")
+        f_section = text_soup.find('ol', {"class": "thread"})
+        if f_section is not None:
+            a_list = chain.from_iterable(
+                forum_text.find_all('a') for forum_text in
+                    f_section.find_all('div', {'class': 'forum_text'})
+            )
+            if with_user:
+                a_list = chain(a_list, f_section.find_all('a', {'class': 'avatar'}))
+
+            for a in a_list:
+                if self.a_valid(a):
+                    yield a['href']
+
+            #&lt;a href=&quot;http://viaggiareconibambini.blogspot.com/search/label/Alto%20Adige&quot;
+#            encoding errors
+            for forum_text in f_section.find_all('div', {'class': 'forum_text'}):
+                # find escaped links in text
+                text = forum_text.text
+                for found_url in self.unescape_and_iter(text):
+                    yield found_url
+
+                # and in childs
+                for tag in forum_text.find_all():
+                    text = tag.text
+                    for found_url in self.unescape_and_iter(text):
+                        yield found_url
+                    #            run paginator
+
+            for a_page in self.found_paginator(text_soup):
+                yield a_page
+        else:
+            return
 
 
 class VBulletin_Section(Parser):
@@ -90,7 +201,8 @@ class VBulletin_Section(Parser):
     # http://www.ilgiramondo.net/forum/trentino-alto-adige/
 
      # URL Topic:
-    <a class="title" href="http://www.ilgiramondo.net/forum/trentino-alto-adige/21531-trentino-alto-adige-renon.html" id="thread_title_21531">Trentino Alto Adige - Renon</a>
+    <a class="title" href="http://www.ilgiramondo.net/forum/trentino-alto-adige/21531-trentino-alto-adige-renon.html"
+    id="thread_title_21531">Trentino Alto Adige - Renon</a>
 
     # Paginetion Topic
     <div id="threadlist" class="threadlist">
@@ -99,7 +211,9 @@ class VBulletin_Section(Parser):
                 <dt class="label">25 Pagine <span class="separator">&bull;</span></dt>
                         <dd>
                             <span class="pagelinks">
-                                 <span><a href="http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html">1</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-2/trentino-alto-adige/15753-trentino-alto-adige.html">2</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-3/trentino-alto-adige/15753-trentino-alto-adige.html">3</a></span>
+                                 <span>
+                <a href="http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html">1</a>
+                </span> <span><a href="http://www.ilgiramondo.net/forum/page-2/trentino-alto-adige/15753-trentino-alto-adige.html">2</a></span> <span><a href="http://www.ilgiramondo.net/forum/page-3/trentino-alto-adige/15753-trentino-alto-adige.html">3</a></span>
                                       ... <a href="http://www.ilgiramondo.net/forum/page-25/trentino-alto-adige/15753-trentino-alto-adige.html">25</a>
                                 </span>
                             </dd>
@@ -109,34 +223,31 @@ class VBulletin_Section(Parser):
     """
 
     def match(self, url):
-#   found if is a VBulletin section
-        logging.info('Check VBulletin section rules of the site: %s', url)
+    #   found if is a VBulletin section
+        logger.info('Check VBulletin section rules of the site: %s', url)
         page = get(url)
         section_soup = BeautifulSoup(page, "lxml")
         html = section_soup.find('html')
-        f_section = section_soup.find('div',{"id":"threadlist"},{"class":"threadlist"})
-#        try: # is possible html.get('id') == None
+        f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
         if html.get('id') == 'vbulletin_html' and f_section is not None:
             return True
-#        except:
-#                return False
 
         return False
 
     def found_topic_url(self, div):
-#   found by how many topic is composed the forum section
+    #   found by how many topic is composed the forum section
         for topic in div.find_all('a', {"class": "title"}):
             yield topic.get('href')
 
-    def found_pagination(self,div):
-#   found if is use a pagination for the topic
+    def found_pagination(self, div):
+    #   found if is use a pagination for the topic
         for page in div.find_all('span', {"class": "pagelinks"}): #<span class="pagelinks">
             for url_topic in page.find_all('a'):
                 yield url_topic.get('href')
 
-    def run(self,url):
-        logging.info('Run VBulletin section rules of the site: %s', url)
-        print 'Applico criteri vBulletin_Section'
+    def run(self, url):
+    #   start VBulletin rules
+        logger.info('Run VBulletin section rules of the site: %s', url)
         page = get(url)
         text_soup = BeautifulSoup(page, "lxml")
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
@@ -152,7 +263,8 @@ class VBulletin_Section(Parser):
 
 
 class VBulletin_Topic(Parser):
-    """ ----------------------------- Topic ---------------------------------
+    """
+    ----------------------------- Topic ---------------------------------
     <div id="postlist" class="postlist">
 
     Page 1: http://www.ilgiramondo.net/forum/trentino-alto-adige/6669-trentino-alto-adige-quale-localita.html
@@ -162,49 +274,53 @@ class VBulletin_Topic(Parser):
     <div class="content">
     <div id="post_message_340346">
 
-    <!-- google_ad_section_start -->Io sono stata a Levico Terme a Natale .. c'erano i mercatini, ma mi sembrava carino anche per l'estate.<br />
+    <!-- google_ad_section_start -->
+    Io sono stata a Levico Terme a Natale .. c'erano i mercatini, ma mi sembrava carino anche per l'estate.<br />
 Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la piscina e la sauna nell'hotel.<br />
-<a onclick="_gaq.push(['_trackEvent', 'Outgoing', 'www.eden-hotel.com', '']);" rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.com</a><!-- google_ad_section_end --><!-- GAL -->
+<a onclick="_gaq.push(['_trackEvent', 'Outgoing', 'www.eden-hotel.com', '']);"
+rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.com</a><!-- google_ad_section_end -->
+    <!-- GAL -->
     </div>
 </div>
 
 # Notice: '><!-- google_ad_section_start -->'             '<!-- google_ad_section_end --><!-- GAL -->'
+
     """
 
     def match(self, url):
-#   found if is a VBulletin topic
-        logging.info('Check VBulletin topic rules of the site: %s', url)
+    #   found if is a VBulletin topic
+        logger.info('Check VBulletin topic rules of the site: %s', url)
         page = get(url)
         topic_soup = BeautifulSoup(page, "lxml")
         html = topic_soup.find('html')
-        f_topic = topic_soup.find('div',{"id":"postlist"},{"class":"postlist restrain"})
-#        try: # is possible html.get('id') == None
+        f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
+        #        try: # is possible html.get('id') == None
         if html.get('id') == 'vbulletin_html' and f_topic is not None:
             return True
-#        except:
-#            return False
+        #        except:
+        #            return False
 
         return False
 
     def found_pages(self, text_soup):
-#   found by how many pages is composed the topic
-#   <div id="pagination_top" class="pagination_top">
-        div_lists = text_soup.find('div', {'id':'pagination_top'}, {'class':'pagination_top'})
+    #   found by how many pages is composed the topic
+    #   <div id="pagination_top" class="pagination_top">
+        div_lists = text_soup.find('div', {'id': 'pagination_top'}, {'class': 'pagination_top'})
         for a in div_lists.find_all('a'):
             if a.get('href'):
                 yield a.get('href')
 
-    def messages_url(self,text_soup):
-#   found URL in users' messages
+    def messages_url(self, text_soup):
+    #   found URL in users' messages
         div_lists = text_soup.find_all('div', {"class": "content"}) # type list
         for div in div_lists:
             for a in div.find_all('a'):
                 if a.get('href'):
                     yield a.get('href')
 
-    def run(self,url):
-        logging.info('Run VBulletin section rules of the site: %s', url)
-        print 'Applico criteri di vBulletin_Topic'
+    def run(self, url):
+#        run VBulletin section rules
+        logger.info('Run VBulletin section rules of the site: %s', url)
         page = get(url)
         text_soup = BeautifulSoup(page, "lxml")
         for page_link in self.messages_url(text_soup):
@@ -213,27 +329,26 @@ Non so come sia per la vita serale.. pero' le terme sono carine, c'e' anche la p
             yield pages
 
 
-class Generic_link(Parser):
+class GenericLink(Parser):
 # diffbot's analysis
     def match(self, url):
         return True
 
     # list of link by diffbot
     def run(self, url):
-        logging.info('Run Diffbot on site: %s', url)
-        print 'Applico criteri Diffbot'
+        logger.info('Run Diffbot on site: %s', url)
         try:
-            xmlanswer = get(defpath,60, params=dict(token=s_token, url=url))
+            xmlanswer = get(defpath, 60, params=dict(token=s_token, url=url))
         except requests.exceptions.Timeout:
-            print 'Diffbot sta impiegando troppo tempo per la risposta, salto il link'
+            logger.warning('Invalid URL, Diffbot is taking too long for the answer, skip %s', url)
             return
         try:
             doc = etree.fromstring(xmlanswer.encode('utf-8'))
-        except:
+            for link in doc.iterfind('.//link'):
+                yield link.text.strip()
+        except etree.ParseError:
+            logger.warning('Invalid URL, HTML or Diffbot\'s XML is corrupted , skip %s', url)
             return
-        for link in doc.iterfind('.//link'):
-            yield link.text.strip()
-
 
 # ----------------------------------
 
@@ -241,10 +356,12 @@ def gen_hash(*args, **kwargs):
 # hash file generator (for caching)
 
     import cPickle as pickle
+
     return str(abs(hash(pickle.dumps((args, kwargs)))))
 
+
 def get(url, timeout=30, **kwargs):
-    logging.info('Getting url %s', url)
+    logger.info('Getting url %s', url)
     # hash request
     hash_ = gen_hash(url, kwargs)
     filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
@@ -252,13 +369,12 @@ def get(url, timeout=30, **kwargs):
     # search in cache
     try:
         with BZ2File(filename, 'rb') as f:
-            logging.info('Found in cache: %s', url)
+            logger.info('Found in cache: %s', url)
             return f.read().decode('utf-8')
     except IOError:
         pass
 
-    print url
-    logging.info('Not in cache: %s', url)
+    logger.info('Not in cache: %s', url)
     text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
     with BZ2File(filename, 'wb') as f:
@@ -266,8 +382,8 @@ def get(url, timeout=30, **kwargs):
 
     return text
 
-def option_parser():
 
+def option_parser():
     # python tsm.py --depth=3 --output=output.txt input.txt
     # parse params
 
@@ -280,14 +396,14 @@ def option_parser():
         help="Location of file where save the alias-data", metavar="alias-location")
 
     (options, args) = parser_.parse_args()
-    logging.info('Params: depth= %d, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias, args[0])
+    logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
+        args[0])
 
     # check option (depth)
     if options.depth is None or options.depth <= 0:
         depthRoot = 1
     else:
         depthRoot = int(options.depth)
-    #
 
     writepath = options.output
     aliasLocation = options.alias
@@ -295,34 +411,43 @@ def option_parser():
 
     return depthRoot, writepath, readpath, aliasLocation
 
+
 def number_site(url):
     """
     return the index of the 'url' in the sites_list
     if doesn't exists add him
     """
-    logging.info('Check number for url: %s',url)
+    logger.info('Check number for url: %s', url)
     try:
         return siteslist.index(url)
     except ValueError:
         siteslist.append(clear_site(url))
         return len(siteslist) - 1
 
+
 def clear_site(url):
     # formatting and clearing url
-    s = urlparse(url)
 
-#    print url, s.scheme, s.hostname, s.path
-    logging.info('urlparse: %s',s)
+#    print
+    if url.endswith('print'):
+        url = url.replace('print', '')
+    if url.endswith('print/'):
+        url = url.replace('print/', '')
+
+#   replace '' (space) with %20
+    s = urlparse(url.replace(' ', '%20'))
+
+    logger.info('urlparse: %s', s)
     if s.query == '':
         try:
             site = s.scheme + '://' + s.hostname + s.path
         except TypeError:
-            site = 'http://'+ s.path
+            site = 'http://' + s.path
     else:
         try:
             site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
         except TypeError:
-            site = 'http://'+ s.path + '?' + s.query
+            site = 'http://' + s.path + '?' + s.query
 
     return site
 
@@ -334,70 +459,94 @@ def is_valid(url):
     showthread.php      showthread.php
     javascript://       javascript://
     www.google.it       scheme:""   path:"www.google.it"
-    idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
+    idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/
+                        228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
+
     immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
 
     """
-    logging.info('Url validation: %s', url)
+    logger.info('Url validation: %s', url)
+    inv = 'Invalid URL, '
+
+    from mimetypes import guess_type
+    from collections import Counter
+
+    valid = Counter()
+    valid[guess_type(url, strict=True)[0]] += 1
 
     if url == 'javascript://':
+    #        'javascript'
+        logger.warning(inv + 'javascript URL: %s', url)
         return False
 
-    if url.find('showthread.php') > 0:
+    if  0 <= url.find('showthread.php') <= 7 or 0 <= url.find('attachment.php') <= 7:
+    #        post reply
+        logger.warning(inv + 'post\'s reply: (showthread or attachment): %s', url)
+        return False
+
+    if url.endswith('?popup'):
+#        popup login register
+        logger.warning(inv + 'popup login: %s', url)
         return False
 
     s = urlparse(url)
     s_path = s.path.lower()
     s_query = s.query.lower()
 
-    # try (don't sure if this section is utilizable)
-#    try:
     if s.scheme.find('mailto') != -1:
+        logger.warning(inv + 'mail: &s', url)
         return False
-#    except: AttributeError
-#        pass
+
 
     if s.hostname is None and s.path is None:
+#        URL is blank
+        logger.warning(inv + 'URL blank')
         return False
 
-    if s_path.find('immagini') != -1:
-        ###### Image YES ########################
-        imagepath = '\\home\\elia\\temp\\image.txt'
-        logging.info('Write on file, path: %s', imagepath)
-        file = open(imagepath, 'a')
-        file.writelines(url + '\r\n')
-        file.close()
-        ######################################
+    if s_path.find('immagini') != -1 or\
+       s_path.find('image') != -1 or\
+       s_path.find('photo') != -1 or\
+       s_path.find('foto') != -1 or\
+       s_path.find('photogallery') != -1 or\
+       s_path.find('fotogallery') != -1 or\
+       s_query.find('idphoto') != -1 or\
+       s_query.find('idfoto') != -1:
+#        URL to image
+        logger.warning(inv + 'image URL: %s', url)
         return False
-    if s_query.find('idfoto') != -1:
+
+    if s_path.find('/forum/p/abuse/') != -1:
+#        popup login registration
+        logger.warning(inv + 'registration login: %s', s_path)
         return False
 
     try:
         get(url)
-    except:
+
+    except requests.exceptions.ConnectionError:
+    #        server unreachable or nonexistent
+        logger.warning(inv + 'server unreachable or nonexistent: %s', url)
         return False
 
-#    except requests.exceptions.ConnectionError:
-#        print 'Server non raggiungibile o inesistente'
-#        logging.info('Server unreachable or nonexistent: %s', url)
-#        return False
-#
-#    except requests.exceptions.Timeout:
-#        print 'Il server sta impiegando troppo tempo per la risposta, salto il link'
-#        logging.info('Timeout link: %s', url)
-#        return False
-#
-#    except UnicodeError:
-#        Fake link, or invalid extensions
-#        print 'Url non valido'
-#        logging.info('Url unacceptable: %s', url)
-#        return False
-#
-#    except TypeError:
-#        Invalid extensions
-#        print 'Url non valido'
-#        logging.info('Url unacceptable: %s', url)
-#        return False
+    except requests.exceptions.Timeout:
+    #        timeout link
+        logger.warning(inv + 'timeout link: %s', url)
+        return False
+
+    except UnicodeError:
+    #        fake link, or invalid extensions
+        logger.warning(inv + 'URL unacceptable: %s', url)
+        return False
+
+    except TypeError:
+    #        invalid extensions
+        logger.warning(inv + 'invalid extension: %s', url)
+        return False
+
+    except requests.exceptions.InvalidSchema:
+    #        HTML corrupted
+        logger.warning(inv + 'HTML corrupted: %s', url)
+        return False
 
     return True
 
@@ -415,16 +564,17 @@ s_token = '22df3421e2ecce206e95c4e68b44b9aa'
 # ----------MAIN -------------
 
 if __name__ == "__main__":
-    print '\r'
-    print 'Avvio programma Analisi v0.1.1'
-    print '\r'
+    logger.info('URL-Graphs --- START --- v1.2.5')
 
     # class define
+    from collections import Counter
+
+    valid = Counter()
     defSite = DefSites()
     defSite.register(VBulletin_Section())
     defSite.register(VBulletin_Topic())
-#    defSite.register(TuristiPerCaso())
-    defSite.register(Generic_link())
+    defSite.register(TuristiPerCaso())
+    defSite.register(GenericLink())
 
     depthRoot, writepath, readpath, aliasLocation = option_parser()
     siteslist = []
@@ -455,43 +605,39 @@ if __name__ == "__main__":
                 url = jobs[current_depth].pop()
                 parser = defSite.get_parser_for(url)
                 print '\r'
-                print 'Analisi sito: ' + url
-                print 'Profondita\': ' + str(current_depth)
+                logger.info('Site under analysis: %s', url)
+                logger.info('Depth: %d', current_depth)
 
-#                if is_valid(url) == False:
-#                    break
+                #                if is_valid(url) == False:
+                #                    break
 
-                if writepath is not None:
-                    if aliasLocation is not None:
-                        stringURL = 'N{0}'.format(number_site(url))
-                    else:
-                         stringURL = url
+                if aliasLocation is not None:
+                    stringURL = 'N{0}'.format(number_site(url))
                 else:
-                    print '\r'
-                    stringURL = url + '\r\n'
+                    stringURL = url
 
                 for found_url in parser.run(url):
                     if is_valid(found_url):
-                        logging.info('found_url: %s',found_url)
+                        logger.info('found_url: %s', found_url)
                         found_url = clear_site(found_url)
                         if number_site(found_url) == len(siteslist) - 1 and current_depth < depthRoot:
                             jobs[current_depth + 1].append(found_url)
 
-                        if writepath is not None:
-                            if aliasLocation is not None:
-                                stringURL = stringURL + "  " + 'N{0}'.format(number_site(found_url))
-                            else:
-                                stringURL = stringURL + "     " + found_url
+                        if aliasLocation is not None:
+                            stringURL = stringURL + "  " + 'N{0}'.format(number_site(found_url))
                         else:
-                            stringURL = stringURL + "     " + found_url + '\r\n'
+                            stringURL = stringURL + "     " + found_url
 
                 if writepath is None:
-                    print stringURL
+                    logger.critical(stringURL)
 
                 else:
+                #                    print stringURL
+                    logger.critical(stringURL)
                     file.write_on_file(stringURL)
                     file.write_on_file('\r\n')
                     file.write_on_file('\r\n')
+
             except IndexError:
                 break
 
@@ -501,7 +647,9 @@ if __name__ == "__main__":
             break
 
     if aliasLocation is not None and writepath is not None:
-        print 'Scrittura alias'
+    #        print 'Scrittura alias'
+        logger.info('Alias writing')
         file.write_alias()
 
-    print 'Operazione Terminata'
+    #    print 'Operazione Terminata'
+    logger.info('MISSION ACCOMPLISHED')
