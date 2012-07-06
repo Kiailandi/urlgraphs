@@ -116,7 +116,7 @@ def absolutize(iterator):
     from urlparse import urljoin
 
     for base_url, url in iterator:
-        yield base_url, urljoin(base_url, url).replace('/../', '/')
+        yield urljoin(base_url, url).replace('/../', '/')
 
 def main():
     tpcf_parser = TuristiPerCasoForum()

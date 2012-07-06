@@ -389,6 +389,21 @@ class GenericLink(Parser):
             logger.warning('Invalid URL, HTML or Diffbot\'s XML is corrupted , skip %s', url)
             return
 
+
+class AlLink(Parser):
+#    Anlysis on all link of the site
+    def match(self, url):
+        return True
+
+    # list of link
+    def run(self, url):
+        logger.info('Run AlLink on site: %s', url)
+        page = get(url)
+        text_soup = BeautifulSoup(page, "lxml")
+        a_lists = text_soup.find_all('a') # a list
+        for a in a_lists:
+            yield a.get('href')
+
 # ----------------------------------
 
 def gen_hash(*args, **kwargs):
@@ -460,15 +475,22 @@ def number_site(url):
     try:
         return siteslist.index(url)
     except ValueError:
-        siteslist.append(clear_site(url))
+        siteslist.append(url)
         if aliasLocation is not None and writepath is not None:
             logger.info('Alias writing')
             file.write_alias(len(siteslist) - 1, url)
         return len(siteslist) - 1
 
 
-def clear_site(url):
+def clear_site(url,base=' '):
     # formatting and clearing url
+
+    if url is None:
+        return url
+
+#    contact
+    if url.startswith('/'):
+        url = absolutize(url,base)
 
 #    print
     if url.endswith('print'):
@@ -493,6 +515,9 @@ def clear_site(url):
 
     return site
 
+def absolutize(found_url,base_url):
+    from urlparse import urljoin
+    return urljoin(base_url, found_url).replace('/../', '/')
 
 def is_valid(url):
     """
@@ -509,12 +534,18 @@ def is_valid(url):
     """
     logger.info('Url validation: %s', url)
     inv = 'Invalid URL, '
+    if url is None:
+        logger.warning(inv + 'link blank')
+        return False
 
-    from mimetypes import guess_type
-    from collections import Counter
-
-    valid = Counter()
-    valid[guess_type(url, strict=True)[0]] += 1
+#    from mimetypes import guess_type
+#    mime_type = {'.mp4': 'video/mp4', '.mov':'video/quicktime', '.exe':'application/x-msdos-program',
+#                 '.pdf':'application/pdf','.js':'application/javascript','.gif':'image/gif',
+#                 '.png':'image/png','.jpg/jpeg':'image/jpeg','.bmp':'image/x-ms-bmp',
+#                 '.swf':'application/x-shockwave-flash','.flv':'video/x-flv'}
+#    mime = guess_type(url)
+#    if mime_type.has_key(mime[0]) != -1:
+#        return False
 
     if url == 'javascript://':
     #        'javascript'
@@ -545,7 +576,6 @@ def is_valid(url):
     if s.scheme.find('mailto') != -1:
         logger.warning(inv + 'mail: &s', url)
         return False
-
 
     if s.hostname is None and s.path is None:
 #        URL is blank
@@ -616,15 +646,14 @@ if __name__ == "__main__":
     logger.info('URL-Graphs --- START --- v2.0.1')
 
     # class define
-    from collections import Counter
-
-    valid = Counter()
     defSite = DefSites()
     defSite.register(VBulletin_Section())
     defSite.register(VBulletin_Topic())
     defSite.register(YahooAnswer())
     defSite.register(TuristiPerCaso())
     defSite.register(GenericLink())
+#    defSite.register(AlLink())
+#   dictionary extension initialization
 
     depthRoot, writepath, readpath, aliasLocation = option_parser()
     siteslist = []
@@ -667,9 +696,9 @@ if __name__ == "__main__":
                     stringURL = url
 
                 for found_url in parser.run(url):
+                    found_url = clear_site(found_url,url)
                     if is_valid(found_url):
                         logger.info('found_url: %s', found_url)
-                        found_url = clear_site(found_url)
                         if number_site(found_url) == len(siteslist) - 1 and current_depth < depthRoot:
                             jobs[current_depth + 1].append(found_url)
 

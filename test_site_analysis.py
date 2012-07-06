@@ -44,6 +44,7 @@ class TestMyModule(unittest.TestCase):
    def test_is_valid(self):
        from site_analysis import is_valid
        self.assertTrue(is_valid('http://it.wikipedia.org/wiki/Python/'))
+#       self.assertFalse(is_valid('http://fakeurl.it/doc.pdf'))
        self.assertFalse(is_valid('javascript://'))
        self.assertFalse(is_valid('http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484'))
        self.assertFalse(is_valid('http://showthread.php/?s=8714a40618cf41351b24bd0cbd6729d7&p=884417#post884417'))
@@ -105,6 +106,10 @@ class TestMyModule(unittest.TestCase):
        thread_topics, messages_topic = ya.yahoo_page_parser('http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO')
        self.assertEqual(len(list(ya.found_messages_topic(messages_topic))),1)
 
+   def test_AlLink(self):
+       from site_analysis import AlLink
+       al = AlLink()
+       self.assertEqual(len(list(al.run('http://www.mentalhealthforum.ch'))),14)
 
 if __name__ == "__main__":
     unittest.main()
