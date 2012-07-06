@@ -45,7 +45,9 @@ class TestMyModule(unittest.TestCase):
        from site_analysis import is_valid
        self.assertTrue(is_valid('http://it.wikipedia.org/wiki/Python/'))
        self.assertFalse(is_valid('javascript://'))
+       self.assertFalse(is_valid('http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484'))
        self.assertFalse(is_valid('http://showthread.php/?s=8714a40618cf41351b24bd0cbd6729d7&p=884417#post884417'))
+       self.assertFalse(is_valid('http://www.forumviaggiatori.com/members/norman+wells.htm'))
        self.assertFalse(is_valid('mailto:mail_user@webhost.com'))
        self.assertFalse(is_valid('http://turistipercaso.it/forum/p/abuse/775751/'))
        self.assertFalse(is_valid('http://turistipercaso.it/u/u/login/?popup'))
@@ -78,16 +80,31 @@ class TestMyModule(unittest.TestCase):
        from site_analysis import TuristiPerCaso
        from bs4 import BeautifulSoup
        import requests
-       vbt = TuristiPerCaso()
-       self.assertTrue(vbt.match('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
-       self.assertTrue(vbt.match('https://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
-       self.assertTrue(vbt.match('http://www.turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
-       self.assertTrue(vbt.match('https://www.turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
+       tpc = TuristiPerCaso()
+       self.assertTrue(tpc.match('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
+       self.assertTrue(tpc.match('https://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
+       self.assertTrue(tpc.match('http://www.turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
+       self.assertTrue(tpc.match('https://www.turistipercaso.it/forum/t/71583/isole-della-grecia.html'))
        grecia_soup = BeautifulSoup(requests.get('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html').text, "lxml")
-       self.assertEqual(len(list(vbt.found_paginator(grecia_soup))),6)
+       self.assertEqual(len(list(tpc.found_paginator(grecia_soup))),6)
        messico_soup = BeautifulSoup(requests.get('http://turistipercaso.it/forum/t/194776/holbox-messico.html').text, "lxml")
-       self.assertEqual(len(list(vbt.found_paginator(messico_soup))),0)
-       self.assertEqual(len(list(vbt.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))),len(list(vbt.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))))
+       self.assertEqual(len(list(tpc.found_paginator(messico_soup))),0)
+       self.assertEqual(len(list(tpc.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))),len(list(tpc.run('http://turistipercaso.it/forum/t/71583/isole-della-grecia.html'))))
+
+   def test_Yahoo_Answer(self):
+       from site_analysis import YahooAnswer
+       ya = YahooAnswer()
+       self.assertTrue(ya.match('http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO')) #Topic
+       self.assertTrue(ya.match('http://it.answers.yahoo.com/dir/index;_ylt=AlfwvVcRJfbSNGQd1gwtODlGWH1G;_ylv=3?sid=396546975&link=resolved#yan-questions')) #Section
+       self.assertFalse(ya.match('https://login.yahoo.com/'))
+       self.assertEqual(len(list(ya.run('http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO'))),1)
+       self.assertEqual(len(list(ya.run('http://it.answers.yahoo.com/dir/index;_ylt=AlfwvVcRJfbSNGQd1gwtODlGWH1G;_ylv=3?sid=396546975&link=resolved#yan-questions'))),20)
+       self.assertIsNone(ya.yahoo_page_parser('http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO')[0])
+       thread_topics, messages_topic = ya.yahoo_page_parser('http://it.answers.yahoo.com/dir/index;_ylt=AlfwvVcRJfbSNGQd1gwtODlGWH1G;_ylv=3?sid=396546975&link=resolved#yan-questions')
+       self.assertEqual(len(list(ya.found_thread_topics(thread_topics))),20)
+       thread_topics, messages_topic = ya.yahoo_page_parser('http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO')
+       self.assertEqual(len(list(ya.found_messages_topic(messages_topic))),1)
+
 
 if __name__ == "__main__":
     unittest.main()

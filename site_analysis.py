@@ -54,15 +54,10 @@ class File(object):
         file.writelines(string)
         file.close()
 
-    def write_alias(self):
-        logger.info('Write alias file, path: %s', readpath)
-        try:
-            os.remove(aliasLocation)
-        except  OSError:
-            pass
+    def write_alias(self, n, string):
+        logger.info('Write alias file, path: %s', aliasLocation)
         file = open(aliasLocation, 'a')
-        for i in range(len(siteslist)):
-            file.writelines('N' + str(i) + ': ' + siteslist[i].encode('utf-8') + '\r\n')
+        file.writelines('N' + str(n) + ': ' + siteslist[n].encode('utf-8') + '\r\n')
         file.close()
 
 
@@ -93,6 +88,50 @@ class Parser(object):
         if self.regex:
             return self.regex.match(url)
         return False
+
+
+class YahooAnswer(Parser):
+
+    def yahoo_page_parser(self,url):
+        page = get(url)
+        page_soup = BeautifulSoup(page, "lxml")
+        # section
+        thread_topics = page_soup.find('ul', {"class": "questions"})
+        # topic and section
+        messages_topic = page_soup.find('div', {"id": "yan-content"})
+        return thread_topics, messages_topic
+
+    def match(self, url):
+    #   found if the url contains the acronym 'yahoo'
+        logger.info('Check if is a Yahoo page: %s', url)
+        if url.find('.yahoo.com') != -1:
+            thread_topics, message_topic = self.yahoo_page_parser(url)
+            if thread_topics is not None or message_topic is not None:
+                return  True
+
+        return False
+
+    def found_thread_topics(self,section_topics):
+#        found thread questions in section
+        h3_list = section_topics.findAll('h3')
+        for h3 in h3_list:
+            yield 'http://it.answers.yahoo.com/' + h3.find('a').get('href')
+
+    def found_messages_topic(self,topic_messages):
+#        found messages in the topic question
+        a_list = topic_messages.findAll('a',{'rel':'nofollow'})
+        for a in a_list:
+            yield a.get('href')
+
+    def run(self,url):
+#        start Yahoo answer rule
+        thread_topics, messages_topic = self.yahoo_page_parser(url)
+        if thread_topics is not None:
+            for a in self.found_thread_topics(thread_topics):
+                yield a
+        else:
+            for a in self.found_messages_topic(messages_topic):
+                yield a
 
 
 class TuristiPerCaso(Parser):
@@ -422,6 +461,9 @@ def number_site(url):
         return siteslist.index(url)
     except ValueError:
         siteslist.append(clear_site(url))
+        if aliasLocation is not None and writepath is not None:
+            logger.info('Alias writing')
+            file.write_alias(len(siteslist) - 1, url)
         return len(siteslist) - 1
 
 
@@ -479,9 +521,16 @@ def is_valid(url):
         logger.warning(inv + 'javascript URL: %s', url)
         return False
 
-    if  0 <= url.find('showthread.php') <= 7 or 0 <= url.find('attachment.php') <= 7:
-    #        post reply
-        logger.warning(inv + 'post\'s reply: (showthread or attachment): %s', url)
+#   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
+    if  url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
+#        post reply / login page
+        logger.warning(inv + 'post\'s reply or login page: (showthread or attachment): %s', url)
+        return False
+
+#    http://www.forumviaggiatori.com/members/norman+wells.htm
+    if url.find('/members/') != -1:
+#        user login page
+        logger.warning(inv + 'user login page: %s', url)
         return False
 
     if url.endswith('?popup'):
@@ -573,6 +622,7 @@ if __name__ == "__main__":
     defSite = DefSites()
     defSite.register(VBulletin_Section())
     defSite.register(VBulletin_Topic())
+    defSite.register(YahooAnswer())
     defSite.register(TuristiPerCaso())
     defSite.register(GenericLink())
 
@@ -582,6 +632,7 @@ if __name__ == "__main__":
     if writepath is not None:
         try:
             os.remove(writepath)
+            os.remove(aliasLocation)
         except OSError:
             pass
 
@@ -596,6 +647,8 @@ if __name__ == "__main__":
         if is_valid(url):
             siteslist.append(clear_site(url))
             jobs[1].append(clear_site(url))
+            if aliasLocation is not None and writepath is not None:
+                file.write_alias(len(siteslist) - 1, url)
 
     current_depth = 1
 
@@ -641,9 +694,5 @@ if __name__ == "__main__":
 
         if not len(jobs[current_depth]):
             break
-
-    if aliasLocation is not None and writepath is not None:
-        logger.info('Alias writing')
-        file.write_alias()
 
     logger.info('MISSION ACCOMPLISHED')
