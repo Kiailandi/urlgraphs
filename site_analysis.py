@@ -41,22 +41,27 @@ except OSError:
 class File(object):
     # load and save input_file, save_file, alias_file
 
+    def __init__(self, read_path, write_path, alias_location):
+        self.readpath = read_path
+        self.writepath = write_path
+        self.aliaslocation = alias_location
+
     def load_file(self):
-        logger.info('Open read file from path: %s', readpath)
-        file = open(readpath, 'r')
+        logger.info('Open read file from path: %s', self.readpath)
+        file = open(self.readpath, 'r')
         s = file.readlines()
         file.close()
         return s
 
     def write_on_file(self, string):
-        logger.info('Write on file, path: %s', writepath)
-        file = open(writepath, 'a')
+        logger.info('Write on file, path: %s', self.writepath)
+        file = open(self.writepath, 'a')
         file.writelines(string)
         file.close()
 
-    def write_alias(self, n, string):
-        logger.info('Write alias file, path: %s', aliasLocation)
-        file = open(aliasLocation, 'a')
+    def write_alias(self, n, siteslist):
+        logger.info('Write alias file, path: %s', self.aliaslocation)
+        file = open(self.aliaslocation, 'a')
         file.writelines('N' + str(n) + ': ' + siteslist[n].encode('utf-8') + '\r\n')
         file.close()
 
@@ -83,6 +88,10 @@ class DefSites(object):
 
 class Parser(object):
     regex = None
+    timeout = 30
+
+    def __init__(self, timeout=30):
+        self.timeout = timeout
 
     def match(self, url):
         if self.regex:
@@ -93,7 +102,7 @@ class Parser(object):
 class YahooAnswer(Parser):
 
     def yahoo_page_parser(self,url):
-        page = get(url)
+        page = get(url,self.timeout)
         page_soup = BeautifulSoup(page, "lxml")
         # section
         thread_topics = page_soup.find('ul', {"class": "questions"})
@@ -139,8 +148,9 @@ class TuristiPerCaso(Parser):
     regex = re.compile('(https?://(www.)?)?turistipercaso.it/forum/')
     html_parser = None
 
-    def __init__(self):
+    def __init__(self, timeout=30):
         self.html_parser = HTMLParser.HTMLParser()
+        self.time= timeout
 
     @staticmethod
     def a_valid(a):
@@ -196,7 +206,7 @@ class TuristiPerCaso(Parser):
     def run(self, url, with_user=False):
 #        run TuristiPerCaso rules
         logger.info('Run TuristiPerCaso rules of the site: %s', url)
-        page = get(url)
+        page = get(url,self.timeout)
         text_soup = BeautifulSoup(page, "lxml")
         f_section = text_soup.find('ol', {"class": "thread"})
         if f_section is not None:
@@ -264,7 +274,7 @@ class VBulletin_Section(Parser):
     def match(self, url):
     #   found if is a VBulletin section
         logger.info('Check VBulletin section rules of the site: %s', url)
-        page = get(url)
+        page = get(url, self.timeout)
         section_soup = BeautifulSoup(page, "lxml")
         html = section_soup.find('html')
         f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
@@ -287,7 +297,7 @@ class VBulletin_Section(Parser):
     def run(self, url):
     #   start VBulletin rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        page = get(url)
+        page = get(url,self.timeout)
         text_soup = BeautifulSoup(page, "lxml")
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
         for div in div_lists:
@@ -329,7 +339,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
     def match(self, url):
     #   found if is a VBulletin topic
         logger.info('Check VBulletin topic rules of the site: %s', url)
-        page = get(url)
+        page = get(url, self.timeout)
         topic_soup = BeautifulSoup(page, "lxml")
         html = topic_soup.find('html')
         f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
@@ -360,7 +370,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
     def run(self, url):
 #        run VBulletin section rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        page = get(url)
+        page = get(url, self.timeout)
         text_soup = BeautifulSoup(page, "lxml")
         for page_link in self.messages_url(text_soup):
             yield page_link
@@ -369,6 +379,17 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
 
 
 class GenericLink(Parser):
+
+# DELETE
+# ----- inizialization -----
+
+    defpath = 'http://www.diffbot.com/api/frontpage'
+
+    s_token = '22df3421e2ecce206e95c4e68b44b9aa'
+
+# ------------------------
+# DELETE
+
 # diffbot's analysis
     def match(self, url):
         return True
@@ -377,7 +398,7 @@ class GenericLink(Parser):
     def run(self, url):
         logger.info('Run Diffbot on site: %s', url)
         try:
-            xmlanswer = get(defpath, 60, params=dict(token=s_token, url=url))
+            xmlanswer = get(self.defpath, self.timeout+30, params=dict(token=self.s_token, url=url))
         except requests.exceptions.Timeout:
             logger.warning('Invalid URL, Diffbot is taking too long for the answer, skip %s', url)
             return
@@ -398,16 +419,15 @@ class AlLink(Parser):
     # list of link
     def run(self, url):
         logger.info('Run AlLink on site: %s', url)
-        page = get(url)
+        page = get(url, self.timeout)
         text_soup = BeautifulSoup(page, "lxml")
         a_lists = text_soup.find_all('a') # a list
         for a in a_lists:
             yield a.get('href')
 
-# ----------------------------------
 
 def gen_hash(*args, **kwargs):
-# hash file generator (for caching)
+    # hash file generator (for caching)
 
     import cPickle as pickle
 
@@ -436,292 +456,321 @@ def get(url, timeout=30, **kwargs):
 
     return text
 
+# ----------------------------------
 
-def option_parser():
-    # python tsm.py --depth=3 --output=output.txt input.txt
-    # parse params
+class Main(object):
 
-    parser_ = OptionParser()
-    parser_.add_option("-d", "--depth", dest="depth",
-        help="Level of depth on the net", metavar="number")
-    parser_.add_option("-o", "--output", dest="output",
-        help="Location of file where save the data", metavar="data-location")
-    parser_.add_option("-a", "--alias", dest="alias",
-        help="Location of file where save the alias-data", metavar="alias-location")
-
-    (options, args) = parser_.parse_args()
-    logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
-        args[0])
-
-    # check option (depth)
-    if options.depth is None or options.depth <= 0:
-        depthRoot = 1
-    else:
-        depthRoot = int(options.depth)
-
-    writepath = options.output
-    aliasLocation = options.alias
-    readpath = args[0]
-
-    return depthRoot, writepath, readpath, aliasLocation
-
-
-def number_site(url):
-    """
-    return the index of the 'url' in the sites_list
-    if doesn't exists add him
-    """
-    logger.info('Check number for url: %s', url)
-    try:
-        return siteslist.index(url)
-    except ValueError:
-        siteslist.append(url)
-        if aliasLocation is not None and writepath is not None:
-            logger.info('Alias writing')
-            file.write_alias(len(siteslist) - 1, url)
-        return len(siteslist) - 1
-
-
-def clear_site(url,base=' '):
-    # formatting and clearing url
-
-    if url is None:
-        return url
-
-#   /contact
-    url = absolutize(url,base)
-
-#    print
-    if url.endswith('print'):
-        url = url.replace('print', '')
-    if url.endswith('print/'):
-        url = url.replace('print/', '')
-
-#   replace '' (space) with %20
-    s = urlparse(url.replace(' ', '%20'))
-
-    logger.info('urlparse: %s', s)
-    if s.query == '':
-        try:
-            site = s.scheme + '://' + s.hostname + s.path
-        except TypeError:
-            site = 'http://' + s.path
-    else:
-        try:
-            site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
-        except TypeError:
-            site = 'http://' + s.path + '?' + s.query
-
-    return site
-
-def absolutize(found_url,base_url):
-    from urlparse import urljoin
-    return urljoin(base_url, found_url).replace('/../', '/')
-
-def is_valid(url):
-    """
-    function for found if an url is valid for the research
-
-    showthread.php      showthread.php
-    javascript://       javascript://
-    www.google.it       scheme:""   path:"www.google.it"
-    idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/
-                        228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
-
-    immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
-
-    """
-    logger.info('Url validation: %s', url)
-    inv = 'Invalid URL, '
-    if url is None:
-        logger.warning(inv + 'link blank')
-        return False
-
-    from mimetypes import guess_type
-    mime_type = {'.mp4': 'video/mp4', '.mov':'video/quicktime', '.exe':'application/x-msdos-program',
-                 '.pdf':'application/pdf','.js':'application/javascript','.gif':'image/gif',
-                 '.png':'image/png','.jpg/jpeg':'image/jpeg','.bmp':'image/x-ms-bmp',
-                 '.swf':'application/x-shockwave-flash','.flv':'video/x-flv'}
-    mime = guess_type(url)
-    if mime[0] in mime_type.values():
-        return False
-
-    if url == 'javascript://':
-    #        'javascript'
-        logger.warning(inv + 'javascript URL: %s', url)
-        return False
-
-#   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
-    if  url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
-#        post reply / login page
-        logger.warning(inv + 'post\'s reply or login page: (showthread or attachment): %s', url)
-        return False
-
-#    http://www.forumviaggiatori.com/members/norman+wells.htm
-    if url.find('/members/') != -1:
-#        user login page
-        logger.warning(inv + 'user login page: %s', url)
-        return False
-
-    if url.endswith('?popup'):
-#        popup login register
-        logger.warning(inv + 'popup login: %s', url)
-        return False
-
-    s = urlparse(url)
-    s_path = s.path.lower()
-    s_query = s.query.lower()
-
-    if s.scheme.find('mailto') != -1:
-        logger.warning(inv + 'mail: &s', url)
-        return False
-
-    if s.hostname is None and s.path is None:
-#        URL is blank
-        logger.warning(inv + 'URL blank')
-        return False
-
-    if s_path.find('immagini') != -1 or\
-       s_path.find('image') != -1 or\
-       s_path.find('photo') != -1 or\
-       s_path.find('foto') != -1 or\
-       s_path.find('photogallery') != -1 or\
-       s_path.find('fotogallery') != -1 or\
-       s_query.find('idphoto') != -1 or\
-       s_query.find('idfoto') != -1:
-#        URL to image
-        logger.warning(inv + 'image URL: %s', url)
-        return False
-
-    if s_path.find('/forum/p/abuse/') != -1:
-#        popup login registration
-        logger.warning(inv + 'registration login: %s', s_path)
-        return False
-
-    try:
-        get(url)
-
-    except requests.exceptions.ConnectionError:
-    #        server unreachable or nonexistent
-        logger.warning(inv + 'server unreachable or nonexistent: %s', url)
-        return False
-
-    except requests.exceptions.Timeout:
-    #        timeout link
-        logger.warning(inv + 'timeout link: %s', url)
-        return False
-
-    except UnicodeError:
-    #        fake link, or invalid extensions
-        logger.warning(inv + 'URL unacceptable: %s', url)
-        return False
-
-    except TypeError:
-    #        invalid extensions
-        logger.warning(inv + 'invalid extension: %s', url)
-        return False
-
-    except requests.exceptions.InvalidSchema:
-    #        HTML corrupted
-        logger.warning(inv + 'HTML corrupted: %s', url)
-        return False
-
-    return True
-
-# DELETE
-# ----- inizialization -----
-
-defpath = 'http://www.diffbot.com/api/frontpage'
-
-s_token = '22df3421e2ecce206e95c4e68b44b9aa'
-
-# ------------------------
-# DELETE
-
-
-# ----------MAIN -------------so
-
-if __name__ == "__main__":
-    logger.info('URL-Graphs --- START --- v2.0.3')
-    # DEVELOP
-
-    # class define
-    defSite = DefSites()
-    defSite.register(VBulletin_Section())
-    defSite.register(VBulletin_Topic())
-    defSite.register(YahooAnswer())
-    defSite.register(TuristiPerCaso())
-    defSite.register(GenericLink())
-#    defSite.register(AlLink())
-#   dictionary extension initialization
-
-    depthRoot, writepath, readpath, aliasLocation = option_parser()
+    alias_location = ''
+    write_path = ''
+    depthRoot = 1
     siteslist = []
-    file = File()
-    if writepath is not None:
-        try:
-            os.remove(writepath)
-            os.remove(aliasLocation)
-        except OSError:
-            pass
-
-    temp = file.load_file()
+    defSite = []
     jobs = defaultdict(list)
+    iofile = None
 
-    #  siteslist's inizialization
-    for url in temp:
-        url = url.strip()
-        if not url:
-            continue
-        if is_valid(url):
-            siteslist.append(clear_site(url))
-            jobs[1].append(clear_site(url))
-            if aliasLocation is not None and writepath is not None:
-                file.write_alias(len(siteslist) - 1, url)
+    def option_parser(self):
+        # python tsm.py --depth=3 --output=output.txt input.txt
+        # parse params
 
-    current_depth = 1
+        parser_ = OptionParser()
+        parser_.add_option("-d", "--depth", dest="depth",
+            help="Level of depth on the net", metavar="number")
+        parser_.add_option("-o", "--output", dest="output",
+            help="Location of file where save the data", metavar="data-location")
+        parser_.add_option("-a", "--alias", dest="alias",
+            help="Location of file where save the alias-data", metavar="alias-location")
 
-    while True:
-        while True:
+        (options, args) = parser_.parse_args()
+        logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
+            args[0])
+
+        # check option (depth)
+        if options.depth is None or options.depth <= 0:
+            depthRoot = 1
+        else:
+            depthRoot = int(options.depth)
+
+        write_path = options.output
+        alias_location = options.alias
+        read_path = args[0]
+
+        return depthRoot, write_path, read_path, alias_location
+
+
+    def number_site(self, url):
+        """
+        return the index of the 'url' in the sites_list
+        if doesn't exists add him
+        """
+        logger.info('Check number for url: %s', url)
+        try:
+            return self.siteslist.index(url)
+        except ValueError:
+            self.siteslist.append(url)
+            if self.alias_location is not None and self.write_path is not None:
+                logger.info('Alias writing')
+                self.iofile.write_alias(len(self.siteslist) - 1, self.siteslist)
+            return len(self.siteslist) - 1
+
+
+    def clear_site(self, url,base=' '):
+        # formatting and clearing url
+
+        if url is None:
+            return url
+
+    #   /contact
+        url = self.absolutize(url,base)
+
+    #    print
+        if url.endswith('print'):
+            url = url.replace('print', '')
+        if url.endswith('print/'):
+            url = url.replace('print/', '')
+
+    #   replace '' (space) with %20
+        s = urlparse(url.replace(' ', '%20'))
+
+        logger.info('urlparse: %s', s)
+        if s.query == '':
             try:
-                url = jobs[current_depth].pop()
-                parser = defSite.get_parser_for(url)
-                print '\r'
-                logger.info('Site under analysis: %s', url)
-                logger.info('Depth: %d', current_depth)
+                site = s.scheme + '://' + s.hostname + s.path
+            except TypeError:
+                site = 'http://' + s.path
+        else:
+            try:
+                site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
+            except TypeError:
+                site = 'http://' + s.path + '?' + s.query
 
-                if aliasLocation is not None:
-                    stringURL = 'N{0}'.format(number_site(url))
+        return site
+
+    def absolutize(self, found_url,base_url):
+        from urlparse import urljoin
+        return urljoin(base_url, found_url).replace('/../', '/')
+
+    def is_valid(self, url):
+        """
+        function for found if an url is valid for the research
+
+        showthread.php      showthread.php
+        javascript://       javascript://
+        www.google.it       scheme:""   path:"www.google.it"
+        idfoto:             http://www.ilturista.info/ugc/foto_viaggi_vacanze/
+                            228-Foto_dell_Oktoberfest_tra_ragazze_e_boccali_della_festa_della_birra_di_Monaco/?idfoto=5161
+
+        immagini:           http://www.ilturista.info/ugc/immagini/istanbul/turchia/6111/
+
+        """
+        logger.info('Url validation: %s', url)
+        inv = 'Invalid URL, '
+
+        if url is None:
+            logger.warning(inv + 'link blank')
+            return False
+
+        #   dictionary extension initialization
+        from mimetypes import guess_type
+        mime_type = {'.mp4': 'video/mp4', '.mov':'video/quicktime','.pdf':'application/pdf',
+                     '.js':'application/javascript','.gif':'image/gif',
+                     '.png':'image/png','.jpg/jpeg':'image/jpeg','.bmp':'image/x-ms-bmp',
+                     '.swf':'application/x-shockwave-flash','.flv':'video/x-flv'}
+        mime = guess_type(url)
+        if mime[0] in mime_type.values():
+            return False
+
+        if url == 'javascript://':
+        #        'javascript'
+            logger.warning(inv + 'javascript URL: %s', url)
+            return False
+
+    #   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
+        if  url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
+    #        post reply / login page
+            logger.warning(inv + 'post\'s reply or login page: (showthread or attachment): %s', url)
+            return False
+
+    #    http://www.forumviaggiatori.com/members/norman+wells.htm
+        if url.find('/members/') != -1:
+    #        user login page
+            logger.warning(inv + 'user login page: %s', url)
+            return False
+
+        if url.endswith('?popup'):
+    #        popup login register
+            logger.warning(inv + 'popup login: %s', url)
+            return False
+
+        s = urlparse(url)
+        s_path = s.path.lower()
+        s_query = s.query.lower()
+
+        if s.scheme.find('mailto') != -1:
+            logger.warning(inv + 'mail: &s', url)
+            return False
+
+        if s.hostname is None and s.path is None:
+    #        URL is blank
+            logger.warning(inv + 'URL blank')
+            return False
+
+        if s_path.find('immagini') != -1 or\
+           s_path.find('image') != -1 or\
+           s_path.find('photo') != -1 or\
+           s_path.find('foto') != -1 or\
+           s_path.find('photogallery') != -1 or\
+           s_path.find('fotogallery') != -1 or\
+           s_query.find('idphoto') != -1 or\
+           s_query.find('idfoto') != -1:
+    #        URL to image
+            logger.warning(inv + 'image URL: %s', url)
+            return False
+
+        if s_path.find('/forum/p/abuse/') != -1:
+    #        popup login registration
+            logger.warning(inv + 'registration login: %s', s_path)
+            return False
+
+        try:
+            get(url)
+
+        except requests.exceptions.ConnectionError:
+        #        server unreachable or nonexistent
+            logger.warning(inv + 'server unreachable or nonexistent: %s', url)
+            return False
+
+        except requests.exceptions.Timeout:
+        #        timeout link
+            logger.warning(inv + 'timeout link: %s', url)
+            return False
+
+        except UnicodeError:
+        #        fake link, or invalid extensions
+            logger.warning(inv + 'URL unacceptable: %s', url)
+            return False
+
+        except TypeError:
+        #        invalid extensions
+            logger.warning(inv + 'invalid extension: %s', url)
+            return False
+
+        except requests.exceptions.InvalidSchema:
+        #        HTML corrupted
+            logger.warning(inv + 'HTML corrupted: %s', url)
+            return False
+
+        return True
+
+    def parser_initializzation(self,
+                               __VBulletin_Section=False,
+                               __VBulletin_Topic=False,
+                               __YahooAnswer=False,
+                               __TuristiPerCaso=False,
+                               __GenericLink=False,
+                               __AlLink=False,
+                               timeout=30):
+
+        # parser define
+        defSite = DefSites()
+        if __VBulletin_Section:
+            defSite.register(VBulletin_Section(timeout))
+        if __VBulletin_Topic:
+            defSite.register(VBulletin_Topic(timeout))
+        if __YahooAnswer:
+            defSite.register(YahooAnswer(timeout))
+        if __TuristiPerCaso:
+            defSite.register(TuristiPerCaso(timeout))
+        if __GenericLink:
+            defSite.register(GenericLink(timeout))
+        if __AlLink:
+            defSite.register(AlLink(timeout))
+
+        return defSite
+
+    def siteslist_initializzation(self, templist):
+
+        self.defSite = self.parser_initializzation(True,True,True,True,True,False,30)
+        siteslist = []
+        #  siteslist's inizialization
+        for url in templist:
+            url = url.strip()
+            if not url:
+                continue
+            if self.is_valid(url):
+                siteslist.append(self.clear_site(url))
+                self.jobs[1].append(self.clear_site(url))
+                if self.alias_location is not None and self.write_path is not None:
+                    self.iofile.write_alias(len(siteslist) - 1, siteslist)
+
+    def work_on_stringURL(self,current_depth):
+        url = self.jobs[current_depth].pop()
+        parser = self.defSite.get_parser_for(url)
+        print '\r'
+        logger.info('Site under analysis: %s', url)
+        logger.info('Depth: %d', current_depth)
+
+        if self.alias_location is not None:
+            stringURL = 'N{0}'.format(self.number_site(url))
+        else:
+            stringURL = url
+
+        for found_url in parser.run(url):
+            found_url = self.clear_site(found_url,url)
+            if self.is_valid(found_url):
+                logger.info('found_url: %s', found_url)
+                if self.number_site(found_url) == len(self.siteslist) - 1 and current_depth < self.depthRoot:
+                    self.jobs[current_depth + 1].append(found_url)
+
+                if self.alias_location is not None:
+                    stringURL = stringURL + "  " + 'N{0}'.format(self.number_site(found_url))
                 else:
-                    stringURL = url
+                    stringURL = stringURL + "     " + found_url
+        return stringURL
 
-                for found_url in parser.run(url):
-                    found_url = clear_site(found_url,url)
-                    if is_valid(found_url):
-                        logger.info('found_url: %s', found_url)
-                        if number_site(found_url) == len(siteslist) - 1 and current_depth < depthRoot:
-                            jobs[current_depth + 1].append(found_url)
+    # ----------MAIN -------------
 
-                        if aliasLocation is not None:
-                            stringURL = stringURL + "  " + 'N{0}'.format(number_site(found_url))
-                        else:
-                            stringURL = stringURL + "     " + found_url
+    def main_tsm(self):
+        logger.info('URL-Graphs --- START --- v2.0.3')
+        # DEVELOP BRANCH
 
-                if writepath is None:
-                    logger.critical(stringURL)
+        self.depthRoot, self.write_path, self.read_path, self.alias_location = self.option_parser()
+        self.iofile = File(self.read_path,self.write_path,self.alias_location)
+        if self.write_path is not None:
+            try:
+                os.remove(self.write_path)
+                os.remove(self.alias_location)
+            except OSError:
+                pass
 
-                else:
-                    logger.critical(stringURL)
-                    file.write_on_file(stringURL)
-                    file.write_on_file('\r\n')
-                    file.write_on_file('\r\n')
+        temp = self.iofile.load_file()
+        self.siteslist_initializzation(temp)
 
-            except IndexError:
+        current_depth = 1
+
+        while True:
+            while True:
+                try:
+                    stringURL = self.work_on_stringURL(current_depth)
+
+                    if self.write_path is None:
+                        logger.critical(stringURL)
+
+                    else:
+                        logger.critical(stringURL)
+                        self.iofile.write_on_file(stringURL)
+                        self.iofile.write_on_file('\r\n')
+                        self.iofile.write_on_file('\r\n')
+
+                except IndexError:
+                    break
+
+            current_depth += 1
+
+            if not len(self.jobs[current_depth]):
                 break
 
-        current_depth += 1
+        logger.info('MISSION ACCOMPLISHED')
 
-        if not len(jobs[current_depth]):
-            break
-
-    logger.info('MISSION ACCOMPLISHED')
+if __name__ == "__main__":
+    p = Main()
+    p.main_tsm()
