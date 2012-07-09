@@ -488,9 +488,8 @@ def clear_site(url,base=' '):
     if url is None:
         return url
 
-#    contact
-    if url.startswith('/'):
-        url = absolutize(url,base)
+#   /contact
+    url = absolutize(url,base)
 
 #    print
     if url.endswith('print'):
@@ -538,14 +537,14 @@ def is_valid(url):
         logger.warning(inv + 'link blank')
         return False
 
-#    from mimetypes import guess_type
-#    mime_type = {'.mp4': 'video/mp4', '.mov':'video/quicktime', '.exe':'application/x-msdos-program',
-#                 '.pdf':'application/pdf','.js':'application/javascript','.gif':'image/gif',
-#                 '.png':'image/png','.jpg/jpeg':'image/jpeg','.bmp':'image/x-ms-bmp',
-#                 '.swf':'application/x-shockwave-flash','.flv':'video/x-flv'}
-#    mime = guess_type(url)
-#    if mime_type.has_key(mime[0]) != -1:
-#        return False
+    from mimetypes import guess_type
+    mime_type = {'.mp4': 'video/mp4', '.mov':'video/quicktime', '.exe':'application/x-msdos-program',
+                 '.pdf':'application/pdf','.js':'application/javascript','.gif':'image/gif',
+                 '.png':'image/png','.jpg/jpeg':'image/jpeg','.bmp':'image/x-ms-bmp',
+                 '.swf':'application/x-shockwave-flash','.flv':'video/x-flv'}
+    mime = guess_type(url)
+    if mime[0] in mime_type.values():
+        return False
 
     if url == 'javascript://':
     #        'javascript'
@@ -643,7 +642,7 @@ s_token = '22df3421e2ecce206e95c4e68b44b9aa'
 # ----------MAIN -------------
 
 if __name__ == "__main__":
-    logger.info('URL-Graphs --- START --- v2.0.1')
+    logger.info('URL-Graphs --- START --- v2.0.3')
 
     # class define
     defSite = DefSites()
