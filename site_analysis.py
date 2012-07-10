@@ -425,6 +425,7 @@ class AlLink(Parser):
         for a in a_lists:
             yield a.get('href')
 
+# ----------------------------------
 
 def gen_hash(*args, **kwargs):
     # hash file generator (for caching)
@@ -456,46 +457,83 @@ def get(url, timeout=30, **kwargs):
 
     return text
 
-# ----------------------------------
+def option_parser():
+    # python tsm.py --depth=3 --output=output.txt input.txt
+    # parse params
 
-class Main(object):
+    parser_ = OptionParser()
+    parser_.add_option("-d", "--depth", dest="depth",
+        help="Level of depth on the net", metavar="number")
+    parser_.add_option("-o", "--output", dest="output",
+        help="Location of file where save the data", metavar="data-location")
+    parser_.add_option("-a", "--alias", dest="alias",
+        help="Location of file where save the alias-data", metavar="alias-location")
 
-    alias_location = ''
-    write_path = ''
+    (options, args) = parser_.parse_args()
+    logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
+        args[0])
+
+    # check option (depth)
+    if options.depth is None or options.depth <= 0:
+        depthRoot = 1
+    else:
+        depthRoot = int(options.depth)
+
+    write_path = options.output
+    alias_location = options.alias
+    read_path = args[0]
+
+    return depthRoot, write_path, read_path, alias_location
+
+class Processor(object):
+
     depthRoot = 1
+    current_depth = 1
     siteslist = []
     defSite = []
     jobs = defaultdict(list)
-    iofile = None
+    parser = None
 
-    def option_parser(self):
-        # python tsm.py --depth=3 --output=output.txt input.txt
-        # parse params
+#   Run Methods
+    def parser_initializzation(self,
+                               __VBulletin_Section=False,
+                               __VBulletin_Topic=False,
+                               __YahooAnswer=False,
+                               __TuristiPerCaso=False,
+                               __GenericLink=False,
+                               __AlLink=False,
+                               timeout=30):
 
-        parser_ = OptionParser()
-        parser_.add_option("-d", "--depth", dest="depth",
-            help="Level of depth on the net", metavar="number")
-        parser_.add_option("-o", "--output", dest="output",
-            help="Location of file where save the data", metavar="data-location")
-        parser_.add_option("-a", "--alias", dest="alias",
-            help="Location of file where save the alias-data", metavar="alias-location")
+        # parser define
+        defSite = DefSites()
+        if __VBulletin_Section:
+            defSite.register(VBulletin_Section(timeout))
+        if __VBulletin_Topic:
+            defSite.register(VBulletin_Topic(timeout))
+        if __YahooAnswer:
+            defSite.register(YahooAnswer(timeout))
+        if __TuristiPerCaso:
+            defSite.register(TuristiPerCaso(timeout))
+        if __GenericLink:
+            defSite.register(GenericLink(timeout))
+        if __AlLink:
+            defSite.register(AlLink(timeout))
 
-        (options, args) = parser_.parse_args()
-        logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
-            args[0])
+        return defSite
 
-        # check option (depth)
-        if options.depth is None or options.depth <= 0:
-            depthRoot = 1
-        else:
-            depthRoot = int(options.depth)
+    def siteslist_initializzation(self, templist):
 
-        write_path = options.output
-        alias_location = options.alias
-        read_path = args[0]
+        self.defSite = self.parser_initializzation(True,True,True,True,True,False,30)
+        #  siteslist's inizialization
+        for url in templist:
+            url = url.strip()
+            if not url:
+                continue
+            if self.is_valid(url):
+                self.siteslist.append(self.clear_site(url))
+                self.jobs[1].append(self.clear_site(url))
 
-        return depthRoot, write_path, read_path, alias_location
-
+    # ---------------------------------
 
     def number_site(self, url):
         """
@@ -507,9 +545,6 @@ class Main(object):
             return self.siteslist.index(url)
         except ValueError:
             self.siteslist.append(url)
-            if self.alias_location is not None and self.write_path is not None:
-                logger.info('Alias writing')
-                self.iofile.write_alias(len(self.siteslist) - 1, self.siteslist)
             return len(self.siteslist) - 1
 
 
@@ -661,116 +696,87 @@ class Main(object):
 
         return True
 
-    def parser_initializzation(self,
-                               __VBulletin_Section=False,
-                               __VBulletin_Topic=False,
-                               __YahooAnswer=False,
-                               __TuristiPerCaso=False,
-                               __GenericLink=False,
-                               __AlLink=False,
-                               timeout=30):
+    def check_alias(self, n, file):
+        if n == len(self.siteslist)-1 and file.aliaslocation is not None and file.writepath is not None:
+            logger.info('Alias writing')
+            file.write_alias(len(self.siteslist) - 1, self.siteslist)
 
-        # parser define
-        defSite = DefSites()
-        if __VBulletin_Section:
-            defSite.register(VBulletin_Section(timeout))
-        if __VBulletin_Topic:
-            defSite.register(VBulletin_Topic(timeout))
-        if __YahooAnswer:
-            defSite.register(YahooAnswer(timeout))
-        if __TuristiPerCaso:
-            defSite.register(TuristiPerCaso(timeout))
-        if __GenericLink:
-            defSite.register(GenericLink(timeout))
-        if __AlLink:
-            defSite.register(AlLink(timeout))
-
-        return defSite
-
-    def siteslist_initializzation(self, templist):
-
-        self.defSite = self.parser_initializzation(True,True,True,True,True,False,30)
-        siteslist = []
-        #  siteslist's inizialization
-        for url in templist:
-            url = url.strip()
-            if not url:
-                continue
-            if self.is_valid(url):
-                siteslist.append(self.clear_site(url))
-                self.jobs[1].append(self.clear_site(url))
-                if self.alias_location is not None and self.write_path is not None:
-                    self.iofile.write_alias(len(siteslist) - 1, siteslist)
-
-    def work_on_stringURL(self,current_depth):
-        url = self.jobs[current_depth].pop()
-        parser = self.defSite.get_parser_for(url)
-        print '\r'
-        logger.info('Site under analysis: %s', url)
-        logger.info('Depth: %d', current_depth)
-
-        if self.alias_location is not None:
-            stringURL = 'N{0}'.format(self.number_site(url))
-        else:
-            stringURL = url
-
-        for found_url in parser.run(url):
+    def run(self, url):
+        for found_url in self.parser.run(url):
             found_url = self.clear_site(found_url,url)
             if self.is_valid(found_url):
                 logger.info('found_url: %s', found_url)
-                if self.number_site(found_url) == len(self.siteslist) - 1 and current_depth < self.depthRoot:
-                    self.jobs[current_depth + 1].append(found_url)
-
-                if self.alias_location is not None:
-                    stringURL = stringURL + "  " + 'N{0}'.format(self.number_site(found_url))
-                else:
-                    stringURL = stringURL + "     " + found_url
-        return stringURL
+                if self.number_site(found_url) == len(self.siteslist) - 1 and self.current_depth < self.depthRoot:
+                    self.jobs[self.current_depth + 1].append(found_url)
+                yield found_url
 
     # ----------MAIN -------------
 
     def main_tsm(self):
+
         logger.info('URL-Graphs --- START --- v2.0.3')
         # DEVELOP BRANCH
 
-        self.depthRoot, self.write_path, self.read_path, self.alias_location = self.option_parser()
-        self.iofile = File(self.read_path,self.write_path,self.alias_location)
-        if self.write_path is not None:
+        self.depthRoot, write_path, read_path, alias_location = option_parser()
+        file = File(read_path, write_path, alias_location)
+        if write_path is not None:
             try:
-                os.remove(self.write_path)
-                os.remove(self.alias_location)
+                os.remove(write_path)
+                os.remove(alias_location)
             except OSError:
                 pass
 
-        temp = self.iofile.load_file()
+        temp = file.load_file()
         self.siteslist_initializzation(temp)
 
-        current_depth = 1
+        for url in self.siteslist:
+            if alias_location is not None and write_path is not None:
+                file.write_alias(len(self.siteslist) - 1, self.siteslist)
+
+        self.current_depth = 1
 
         while True:
             while True:
                 try:
-                    stringURL = self.work_on_stringURL(current_depth)
+                    url = self.jobs[self.current_depth].pop()
+                    self.parser = self.defSite.get_parser_for(url)
+                    print '\r'
+                    logger.info('Site under analysis: %s', url)
+                    logger.info('Depth: %d', self.current_depth)
 
-                    if self.write_path is None:
+                    if alias_location is not None:
+                        stringURL = 'N{0}'.format(self.number_site(url))
+                        self.check_alias(self.number_site(url),file)
+
+                    else:
+                        stringURL = url
+
+                    for found_url in self.run(url):
+                        if alias_location is not None:
+                            stringURL = stringURL + "  " + 'N{0}'.format(self.number_site(found_url))
+                            self.check_alias(self.number_site(found_url),file)
+                        else:
+                            stringURL = stringURL + "     " + found_url
+
+                    if write_path is None:
                         logger.critical(stringURL)
 
                     else:
                         logger.critical(stringURL)
-                        self.iofile.write_on_file(stringURL)
-                        self.iofile.write_on_file('\r\n')
-                        self.iofile.write_on_file('\r\n')
+                        file.write_on_file(stringURL)
+                        file.write_on_file('\r\n')
+                        file.write_on_file('\r\n')
 
                 except IndexError:
                     break
 
-            current_depth += 1
+            self.current_depth += 1
 
-            if not len(self.jobs[current_depth]):
+            if not len(self.jobs[self.current_depth]):
                 break
 
         logger.info('MISSION ACCOMPLISHED')
 
 if __name__ == "__main__":
-    p = Main()
+    p = Processor()
     p.main_tsm()

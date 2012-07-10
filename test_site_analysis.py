@@ -6,13 +6,13 @@ from site_analysis import VBulletin_Section
 from site_analysis import TuristiPerCaso
 from site_analysis import YahooAnswer
 from site_analysis import AlLink
-from site_analysis import Main
+from site_analysis import Processor
 
 from bs4 import BeautifulSoup
 import requests
 
 class TestIsValid(unittest.TestCase):
-    main = Main()
+    main = Processor()
 
     def test_univoce_url_valid(self):
         self.assertTrue(self.main.is_valid('http://it.wikipedia.org/wiki/Python/'))
@@ -63,7 +63,7 @@ class Parser(unittest.TestCase):
        self.assertTrue(parser.match('www.google.it'))
 
 class TestClearSite(unittest.TestCase):
-   main = Main()
+   main = Processor()
 
    def test_clear_port_80(self):
         self.assertEqual(self.main.clear_site('http://www.miosito.com:80/pagina.html/'),'http://www.miosito.com/pagina.html/')
@@ -168,3 +168,19 @@ class TestAlLink(unittest.TestCase):
 
    def test_AlLink_run_on_page(self):
        self.assertEqual(len(list(self.al.run('http://www.mentalhealthforum.ch'))),14)
+
+
+class TestProcessor(unittest.TestCase):
+    main = Processor()
+
+    def test_number_site(self):
+        self.assertEqual(self.main.number_site('http://www.google.it/'),0)
+        self.assertEqual(self.main.number_site('http://www.google.it/contatti'),1)
+        self.assertEqual(self.main.number_site('http://www.google.it/'),0)
+
+    def test_absolutize(self):
+        self.assertEqual(self.main.absolutize('/contatti','http://www.google.it'),'http://www.google.it/contatti')
+
+#    def test_run(self):
+#        self.assertEqual(len(list(self.main.run('http://www.ilgiramondo.net/forum/trentino-alto-adige/'))),131)
+
