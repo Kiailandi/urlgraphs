@@ -457,45 +457,18 @@ def get(url, timeout=30, **kwargs):
 
     return text
 
-def option_parser():
-    # python tsm.py --depth=3 --output=output.txt input.txt
-    # parse params
-
-    parser_ = OptionParser()
-    parser_.add_option("-d", "--depth", dest="depth",
-        help="Level of depth on the net", metavar="number")
-    parser_.add_option("-o", "--output", dest="output",
-        help="Location of file where save the data", metavar="data-location")
-    parser_.add_option("-a", "--alias", dest="alias",
-        help="Location of file where save the alias-data", metavar="alias-location")
-
-    (options, args) = parser_.parse_args()
-    logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
-        args[0])
-
-    # check option (depth)
-    if options.depth is None or options.depth <= 0:
-        depthRoot = 1
-    else:
-        depthRoot = int(options.depth)
-
-    write_path = options.output
-    alias_location = options.alias
-    read_path = args[0]
-
-    return depthRoot, write_path, read_path, alias_location
-
 class Processor(object):
-
+#    links search engine
     depthRoot = 1
     current_depth = 1
     siteslist = []
-    defSite = []
+    defSite = DefSites()
     jobs = defaultdict(list)
-    parser = None
 
-#   Run Methods
-    def parser_initializzation(self,
+#   Init Engine, templist and depthRoot required
+    def __init__(self,
+                               templist,
+                               depthRoot,
                                __VBulletin_Section=False,
                                __VBulletin_Topic=False,
                                __YahooAnswer=False,
@@ -505,26 +478,25 @@ class Processor(object):
                                timeout=30):
 
         # parser define
-        defSite = DefSites()
         if __VBulletin_Section:
-            defSite.register(VBulletin_Section(timeout))
+            self.defSite.register(VBulletin_Section(timeout))
         if __VBulletin_Topic:
-            defSite.register(VBulletin_Topic(timeout))
+            self.defSite.register(VBulletin_Topic(timeout))
         if __YahooAnswer:
-            defSite.register(YahooAnswer(timeout))
+            self.defSite.register(YahooAnswer(timeout))
         if __TuristiPerCaso:
-            defSite.register(TuristiPerCaso(timeout))
+            self.defSite.register(TuristiPerCaso(timeout))
         if __GenericLink:
-            defSite.register(GenericLink(timeout))
+            self.defSite.register(GenericLink(timeout))
         if __AlLink:
-            defSite.register(AlLink(timeout))
+            self.defSite.register(AlLink(timeout))
 
-        return defSite
+        self.depthRoot = depthRoot
+        self.siteslist_initializzation(templist)
 
     def siteslist_initializzation(self, templist):
-
-        self.defSite = self.parser_initializzation(True,True,True,True,True,False,30)
         #  siteslist's inizialization
+
         for url in templist:
             url = url.strip()
             if not url:
@@ -535,7 +507,7 @@ class Processor(object):
 
     # ---------------------------------
 
-    def number_site(self, url):
+    def index_site(self, url):
         """
         return the index of the 'url' in the sites_list
         if doesn't exists add him
@@ -581,6 +553,8 @@ class Processor(object):
         return site
 
     def absolutize(self, found_url,base_url):
+#        absolutize url
+#        /contatti -> htto://www.google/contatti
         from urlparse import urljoin
         return urljoin(base_url, found_url).replace('/../', '/')
 
@@ -696,76 +670,40 @@ class Processor(object):
 
         return True
 
-    def check_alias(self, n, file):
-        if n == len(self.siteslist)-1 and file.aliaslocation is not None and file.writepath is not None:
-            logger.info('Alias writing')
-            file.write_alias(len(self.siteslist) - 1, self.siteslist)
-
-    def run(self, url):
-        for found_url in self.parser.run(url):
+    def run(self, url,parser):
+#        found links on url, with parser: XYZ
+        for found_url in parser.run(url):
             found_url = self.clear_site(found_url,url)
             if self.is_valid(found_url):
                 logger.info('found_url: %s', found_url)
-                if self.number_site(found_url) == len(self.siteslist) - 1 and self.current_depth < self.depthRoot:
+                if self.index_site(found_url) == len(self.siteslist) - 1 and self.current_depth < self.depthRoot:
                     self.jobs[self.current_depth + 1].append(found_url)
                 yield found_url
 
-    # ----------MAIN -------------
-
-    def main_tsm(self):
-
-        logger.info('URL-Graphs --- START --- v2.0.3')
-        # DEVELOP BRANCH
-
-        self.depthRoot, write_path, read_path, alias_location = option_parser()
-        file = File(read_path, write_path, alias_location)
-        if write_path is not None:
-            try:
-                os.remove(write_path)
-                os.remove(alias_location)
-            except OSError:
-                pass
-
-        temp = file.load_file()
-        self.siteslist_initializzation(temp)
-
-        for i in range(len(self.siteslist)-1):
-            if alias_location is not None and write_path is not None:
-                file.write_alias(i, self.siteslist)
-
+    def analysis(self):
+        """
+        engine 'Main':
+        - pop url
+        - found parser
+        - found url and append in a list
+        - yield tupla : (base url, [list of url])
+        - incrementing current deep
+        - fake tupla -> finish
+        """
+        logger.info('URL-Graphs --- START --- v3.0.1')
         self.current_depth = 1
-
         while True:
             while True:
                 try:
                     url = self.jobs[self.current_depth].pop()
-                    self.parser = self.defSite.get_parser_for(url)
-                    print '\r'
+                    parser = self.defSite.get_parser_for(url)
                     logger.info('Site under analysis: %s', url)
                     logger.info('Depth: %d', self.current_depth)
+                    url_list = []
+                    for found_url in self.run(url,parser):
+                        url_list.append(found_url)
 
-                    if alias_location is not None:
-                        stringURL = 'N{0}'.format(self.number_site(url))
-                        self.check_alias(self.number_site(url),file)
-
-                    else:
-                        stringURL = url
-
-                    for found_url in self.run(url):
-                        if alias_location is not None:
-                            stringURL = stringURL + "  " + 'N{0}'.format(self.number_site(found_url))
-                            self.check_alias(self.number_site(found_url),file)
-                        else:
-                            stringURL = stringURL + "     " + found_url
-
-                    if write_path is None:
-                        logger.critical(stringURL)
-
-                    else:
-                        logger.critical(stringURL)
-                        file.write_on_file(stringURL)
-                        file.write_on_file('\r\n')
-                        file.write_on_file('\r\n')
+                    yield (url,url_list)
 
                 except IndexError:
                     break
@@ -776,7 +714,81 @@ class Processor(object):
                 break
 
         logger.info('MISSION ACCOMPLISHED')
+        yield ('MISSION_ACCOMPLISHED',[])
+
+
+class Tsm(object):
+
+    def option_parser(self):
+    # python Tsm.py --depth=3 --output=output.txt input.txt
+    # parse params
+
+        parser_ = OptionParser()
+        parser_.add_option("-d", "--depth", dest="depth",
+            help="Level of depth on the net", metavar="number")
+        parser_.add_option("-o", "--output", dest="output",
+            help="Location of file where save the data", metavar="data-location")
+        parser_.add_option("-a", "--alias", dest="alias",
+            help="Location of file where save the alias-data", metavar="alias-location")
+
+        (options, args) = parser_.parse_args()
+        logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
+            args[0])
+
+        # check option (depth)
+        if options.depth is None or options.depth <= 0:
+            depthRoot = 1
+        else:
+            depthRoot = int(options.depth)
+
+        write_path = options.output
+        alias_location = options.alias
+        read_path = args[0]
+
+        return depthRoot, write_path, read_path, alias_location
+
+# ----------MAIN -------------
+
+    def main_tsm(self):
+        # DEVELOP BRANCH
+
+        depthRoot, write_path, read_path, alias_location = self.option_parser()
+        file = File(read_path, write_path, alias_location)
+        if write_path is not None:
+            try:
+                os.remove(write_path)
+                os.remove(alias_location)
+            except OSError:
+                pass
+
+        temp = file.load_file()
+        process = Processor(temp,depthRoot,True,True,True,True,True,False,30)
+
+        for i in range(len(process.siteslist)):
+            if alias_location is not None and write_path is not None:
+                file.write_alias(i, process.siteslist)
+
+        for tupla_url in process.analysis():
+            if alias_location is not None:
+                stringURL = 'N{0}'.format(process.index_site(tupla_url[0]))
+            else:
+                stringURL = tupla_url[0]
+            for found_url in tupla_url[1]:
+                if alias_location is not None:
+                    stringURL = stringURL + "  " + 'N{0}'.format(process.index_site(found_url))
+                    file.write_alias(process.index_site(found_url),process.siteslist)
+                else:
+                    stringURL = stringURL + "     " + found_url
+
+            if write_path is None:
+                logger.critical(stringURL)
+
+            else:
+                logger.critical(stringURL)
+                file.write_on_file(stringURL)
+                file.write_on_file('\r\n')
+                file.write_on_file('\r\n')
 
 if __name__ == "__main__":
-    p = Processor()
-    p.main_tsm()
+    tsm = Tsm()
+    tsm.main_tsm()

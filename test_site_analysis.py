@@ -12,41 +12,41 @@ from bs4 import BeautifulSoup
 import requests
 
 class TestIsValid(unittest.TestCase):
-    main = Processor()
+    process = Processor([],1)
 
     def test_univoce_url_valid(self):
-        self.assertTrue(self.main.is_valid('http://it.wikipedia.org/wiki/Python/'))
+        self.assertTrue(self.process.is_valid('http://it.wikipedia.org/wiki/Python/'))
 
     def test_pdf_is_not_valid(self):
-        self.assertFalse(self.main.is_valid('http://fakeurl.it/doc.pdf'))
+        self.assertFalse(self.process.is_valid('http://fakeurl.it/doc.pdf'))
 
     def test_javascript_protocol_not_allowed(self):
-        self.assertFalse(self.main.is_valid('javascript://'))
+        self.assertFalse(self.process.is_valid('javascript://'))
 
     def test_showthread_attachement_validation(self):
-        self.assertFalse(self.main.is_valid('http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484'))
-        self.assertFalse(self.main.is_valid('http://showthread.php/?s=8714a40618cf41351b24bd0cbd6729d7&p=884417#post884417'))
+        self.assertFalse(self.process.is_valid('http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484'))
+        self.assertFalse(self.process.is_valid('http://showthread.php/?s=8714a40618cf41351b24bd0cbd6729d7&p=884417#post884417'))
 
     def test_is_member_validation(self):
-        self.assertFalse(self.main.is_valid('http://www.forumviaggiatori.com/members/norman+wells.htm'))
+        self.assertFalse(self.process.is_valid('http://www.forumviaggiatori.com/members/norman+wells.htm'))
 
     def test_mailto_is_not_valid(self):
-        self.assertFalse(self.main.is_valid('mailto:mail_user@webhost.com'))
+        self.assertFalse(self.process.is_valid('mailto:mail_user@webhost.com'))
 
     def test_TuristiPerCaso_abuse_is_not_valid(self):
-        self.assertFalse(self.main.is_valid('http://turistipercaso.it/forum/p/abuse/775751/'))
+        self.assertFalse(self.process.is_valid('http://turistipercaso.it/forum/p/abuse/775751/'))
 
     def test_TuristiPerCaso_abuse_is_not_valid(self):
-        self.assertFalse(self.main.is_valid('http://turistipercaso.it/u/u/login/?popup'))
+        self.assertFalse(self.process.is_valid('http://turistipercaso.it/u/u/login/?popup'))
 
     def test_photo_are_not_allowed(self):
-        self.assertFalse(self.main.is_valid('http://www.ilturista.info/ugc/foto_viaggi_vacanze/'
+        self.assertFalse(self.process.is_valid('http://www.ilturista.info/ugc/foto_viaggi_vacanze/'
                           '455-Le_cascate_piu_belle_grandi_o_spettacolari_del_mondo/?idfoto=8704'))
-        self.assertFalse(self.main.is_valid('http://www.ilturista.info/ugc/immagini/giordania/asia/1822/'))
-        self.assertFalse(self.main.is_valid('http://www.ilturista.info/photogallery/'))
+        self.assertFalse(self.process.is_valid('http://www.ilturista.info/ugc/immagini/giordania/asia/1822/'))
+        self.assertFalse(self.process.is_valid('http://www.ilturista.info/photogallery/'))
 
     def test_photo_fake_url_not_allowed(self):
-        self.assertFalse(self.main.is_valid('http://fakeurl.it/'))
+        self.assertFalse(self.process.is_valid('http://fakeurl.it/'))
 
 
 class Parser(unittest.TestCase):
@@ -63,19 +63,19 @@ class Parser(unittest.TestCase):
        self.assertTrue(parser.match('www.google.it'))
 
 class TestClearSite(unittest.TestCase):
-   main = Processor()
+   process = Processor([],1)
 
    def test_clear_port_80(self):
-        self.assertEqual(self.main.clear_site('http://www.miosito.com:80/pagina.html/'),'http://www.miosito.com/pagina.html/')
+        self.assertEqual(self.process.clear_site('http://www.miosito.com:80/pagina.html/'),'http://www.miosito.com/pagina.html/')
    def test_clear_space(self):
-        self.assertEqual(self.main.clear_site('http://www.viagginrete-it.it/vacanze/vacanze per famiglie/'),
+        self.assertEqual(self.process.clear_site('http://www.viagginrete-it.it/vacanze/vacanze per famiglie/'),
             'http://www.viagginrete-it.it/vacanze/vacanze%20per%20famiglie/')
    def test_clear_port_80(self):
-        self.assertEqual(self.main.clear_site('http://www.miosito.com:80/pagina.html?params=params'),
+        self.assertEqual(self.process.clear_site('http://www.miosito.com:80/pagina.html?params=params'),
             'http://www.miosito.com/pagina.html?params=params')
    def test_clear_print(self):
-        self.assertEqual(self.main.clear_site('http://www.miosito.com/pagina.html/print'), 'http://www.miosito.com/pagina.html/')
-        self.assertEqual(self.main.clear_site('http://www.miosito.com/pagina.html/print/'), 'http://www.miosito.com/pagina.html/')
+        self.assertEqual(self.process.clear_site('http://www.miosito.com/pagina.html/print'), 'http://www.miosito.com/pagina.html/')
+        self.assertEqual(self.process.clear_site('http://www.miosito.com/pagina.html/print/'), 'http://www.miosito.com/pagina.html/')
 
 
 class TestGenericLink(unittest.TestCase):
@@ -171,16 +171,13 @@ class TestAlLink(unittest.TestCase):
 
 
 class TestProcessor(unittest.TestCase):
-    main = Processor()
-
-    def test_number_site(self):
-        self.assertEqual(self.main.number_site('http://www.google.it/'),0)
-        self.assertEqual(self.main.number_site('http://www.google.it/contatti'),1)
-        self.assertEqual(self.main.number_site('http://www.google.it/'),0)
+    process = Processor([],3)
+    def test_index_site(self):
+        self.assertEqual(self.process.index_site('http://www.google.it/'),0)
+        self.assertEqual(self.process.index_site('http://www.google.it/contatti'),1)
+        self.assertEqual(self.process.index_site('http://www.google.it/'),0)
 
     def test_absolutize(self):
-        self.assertEqual(self.main.absolutize('/contatti','http://www.google.it'),'http://www.google.it/contatti')
-
-#    def test_run(self):
-#        self.assertEqual(len(list(self.main.run('http://www.ilgiramondo.net/forum/trentino-alto-adige/'))),131)
+        self.assertEqual(self.process.absolutize('/contatti','http://www.google.it'),'http://www.google.it/contatti')
+#
 
