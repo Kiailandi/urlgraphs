@@ -729,9 +729,9 @@ class Processor(object):
         temp = file.load_file()
         self.siteslist_initializzation(temp)
 
-        for url in self.siteslist:
+        for i in range(len(self.siteslist)-1):
             if alias_location is not None and write_path is not None:
-                file.write_alias(len(self.siteslist) - 1, self.siteslist)
+                file.write_alias(i, self.siteslist)
 
         self.current_depth = 1
 
