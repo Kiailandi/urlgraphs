@@ -291,11 +291,18 @@ class VBulletin_Section(Parser):
         for topic in div.find_all('a', {"class": "title"}):
             yield topic.get('href')
 
-    def found_pagination(self, div):
+    def found_topic_pagination(self, div):
     #   found if is use a pagination for the topic
         for page in div.find_all('span', {"class": "pagelinks"}): #<span class="pagelinks">
             for url_topic in page.find_all('a'):
                 yield url_topic.get('href')
+
+    def found_section_pagination(self, text_soup):
+    #   found if is use a pagination for the section
+        span_pages = text_soup.find('span', {"class": "selected"})
+        if span_pages is not None:
+            for url_page in span_pages.find_all('a'):
+                yield url_page.get('href')
 
     def run(self, url):
     #   start VBulletin rules
@@ -303,9 +310,12 @@ class VBulletin_Section(Parser):
         page = get(url,self.timeout)
         text_soup = BeautifulSoup(page, "lxml")
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
+        for a in self.found_section_pagination(text_soup):
+            yield a
+
         for div in div_lists:
             cnt = 0
-            for cnt, url in enumerate(self.found_pagination(div)):
+            for cnt, url in enumerate(self.found_topic_pagination(div)):
                 yield url
 
             # if no pagination is a single topic, url
@@ -480,6 +490,7 @@ class Processor(object):
                                __AlLink=False,
                                timeout=30):
 
+        timeout = int(timeout)
         # parser define
         if __VBulletin_Section:
             self.defSite.register(VBulletin_Section(timeout))
@@ -679,7 +690,9 @@ class Processor(object):
             found_url = self.clear_site(found_url,url)
             if self.is_valid(found_url):
                 logger.info('found_url: %s', found_url)
-                if self.index_site(found_url) == len(self.siteslist) - 1 and self.current_depth < self.depthRoot:
+                if self.index_site(found_url) == len(self.siteslist) - 1 and \
+                   self.current_depth < self.depthRoot and \
+                   self.jobs[self.current_depth + 1][len(self.jobs[self.current_depth + 1])-1] != found_url:
                     self.jobs[self.current_depth + 1].append(found_url)
                 yield found_url
 
@@ -717,7 +730,6 @@ class Processor(object):
                 break
 
         logger.info('MISSION ACCOMPLISHED')
-        yield ('MISSION_ACCOMPLISHED',[])
 
 
 class Tsm(object):

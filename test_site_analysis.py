@@ -124,7 +124,7 @@ class TestVBulletinSection(unittest.TestCase):
        self.assertFalse(self.vbt.match('http://www.google.it'))
 
    def test_VBulletin_Section_run_on_page(self):
-       self.assertEqual(len(list(self.vbt.run('http://www.ilgiramondo.net/forum/trentino-alto-adige/'))),131)
+       self.assertEqual(len(list(self.vbt.run('http://www.ilgiramondo.net/forum/trentino-alto-adige/'))),132)
 
 class TestTuristiPerCaso(unittest.TestCase):
    tpc = TuristiPerCaso()
