@@ -40,6 +40,7 @@ except OSError:
 
 class File(object):
     # load and save input_file, save_file, alias_file
+    n_alias = -1
 
     def __init__(self, read_path, write_path, alias_location):
         self.readpath = read_path
@@ -60,10 +61,12 @@ class File(object):
         file.close()
 
     def write_alias(self, n, siteslist):
-        logger.info('Write alias file, path: %s', self.aliaslocation)
-        file = open(self.aliaslocation, 'a')
-        file.writelines('N' + str(n) + ': ' + siteslist[n].encode('utf-8') + '\r\n')
-        file.close()
+        if n > self.n_alias:
+            logger.info('Write alias file, path: %s', self.aliaslocation)
+            file = open(self.aliaslocation, 'a')
+            file.writelines('N' + str(n) + ': ' + siteslist[n].encode('utf-8') + '\r\n')
+            file.close()
+            self.n_alias+=1
 
 
 class DefSites(object):
@@ -690,7 +693,7 @@ class Processor(object):
         - incrementing current deep
         - fake tupla -> finish
         """
-        logger.info('URL-Graphs --- START --- v3.0.1')
+        logger.info('URL-Graphs --- START --- v3.0.2')
         self.current_depth = 1
         while True:
             while True:
