@@ -280,9 +280,12 @@ class VBulletin_Section(Parser):
         page = get(url, self.timeout)
         section_soup = BeautifulSoup(page, "lxml")
         html = section_soup.find('html')
-        f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
-        if html.get('id') == 'vbulletin_html' and f_section is not None:
-            return True
+        if html is not None:
+            f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
+            if html.get('id') == 'vbulletin_html' and f_section is not None:
+                return True
+        else:
+            return False
 
         return False
 
@@ -355,12 +358,15 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
         page = get(url, self.timeout)
         topic_soup = BeautifulSoup(page, "lxml")
         html = topic_soup.find('html')
-        f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
-        #        try: # is possible html.get('id') == None
-        if html.get('id') == 'vbulletin_html' and f_topic is not None:
-            return True
-        #        except:
-        #            return False
+        if html is not None:
+            f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
+            #        try: # is possible html.get('id') == None
+            if html.get('id') == 'vbulletin_html' and f_topic is not None:
+                return True
+            #        except:
+            #            return False
+        else:
+            return False
 
         return False
 
@@ -530,8 +536,7 @@ class Processor(object):
         try:
             return self.siteslist.index(url)
         except ValueError:
-            self.siteslist.append(url)
-            return len(self.siteslist) - 1
+            return -1
 
 
     def clear_site(self, url,base=' '):
@@ -690,10 +695,10 @@ class Processor(object):
             found_url = self.clear_site(found_url,url)
             if self.is_valid(found_url):
                 logger.info('found_url: %s', found_url)
-                if self.index_site(found_url) == len(self.siteslist) - 1 and \
-                   self.current_depth < self.depthRoot and \
-                   self.jobs[self.current_depth + 1][len(self.jobs[self.current_depth + 1])-1] != found_url:
-                    self.jobs[self.current_depth + 1].append(found_url)
+                if self.index_site(found_url) == -1:
+                    self.siteslist.append(found_url)
+                    if self.current_depth < self.depthRoot:
+                        self.jobs[self.current_depth + 1].append(found_url)
                 yield found_url
 
     def analysis(self):
@@ -706,7 +711,7 @@ class Processor(object):
         - incrementing current deep
         - fake tupla -> finish
         """
-        logger.info('URL-Graphs --- START --- v3.0.2')
+        logger.info('URL-Graphs --- START --- v3.1.0')
         self.current_depth = 1
         while True:
             while True:
