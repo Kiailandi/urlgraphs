@@ -48,6 +48,9 @@ class TestIsValid(unittest.TestCase):
     def test_photo_fake_url_not_allowed(self):
         self.assertFalse(self.process.is_valid('http://fakeurl.it/'))
 
+    def test_too_many_redirections(self):
+        self.assertFalse(self.process.is_valid('http://download.repubblica.it/ultimominuto/info_page.jsp'))
+
 
 class Parser(unittest.TestCase):
 
