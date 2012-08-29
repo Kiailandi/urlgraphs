@@ -60,11 +60,11 @@ class File(object):
         file.writelines(string)
         file.close()
 
-    def write_alias(self, n, siteslist):
+    def write_alias(self, n, site):
         if n > self.n_alias:
             logger.info('Write alias file, path: %s', self.aliaslocation)
             file = open(self.aliaslocation, 'a')
-            file.writelines('N' + str(n) + ': ' + siteslist[n].encode('utf-8') + '\r\n')
+            file.writelines('N' + str(n) + ': ' + site.encode('utf-8') + '\r\n')
             file.close()
             self.n_alias += 1
 
@@ -511,11 +511,9 @@ class Processor(object):
             self.defSite.register(AlLink(timeout))
 
         self.depthRoot = depthRoot
-        self.siteslist_initializzation(templist)
+        self.siteslist_initialization(templist)
 
-    def siteslist_initializzation(self, templist):
-        #  siteslist's inizialization
-
+    def siteslist_initialization(self, templist):
         for url in templist:
             url = url.strip()
             if not url:
@@ -805,27 +803,26 @@ class Tsm(object):
         temp = file.load_file()
         process = Processor(temp, depthRoot, True, True, True, True, True, False, 30)
 
-        for i in range(len(process.siteslist)):
-            if alias_location is not None and write_path is not None:
-                file.write_alias(i, process.siteslist)
+        if alias_location is not None and write_path is not None:
+            for i, site in enumerate(process.siteslist):
+                file.write_alias(i, site)
 
         for tupla_url in process.analysis():
             if alias_location is not None:
                 stringURL = 'N{0}'.format(process.index_site(tupla_url[0]))
             else:
                 stringURL = tupla_url[0]
+
             for found_url in tupla_url[1]:
-                if alias_location is not None:
-                    stringURL = stringURL + "  " + 'N{0}'.format(process.index_site(found_url))
-                    file.write_alias(process.index_site(found_url), process.siteslist)
+                if alias_location is None:
+                    stringURL += "     " + found_url
                 else:
-                    stringURL = stringURL + "     " + found_url
+                    index = process.index_site(found_url)
+                    stringURL += "  " + 'N{0}'.format(index)
+                    file.write_alias(index, process.siteslist[index])
 
-            if write_path is None:
-                logger.critical(stringURL)
-
-            else:
-                logger.critical(stringURL)
+            logger.critical(stringURL)
+            if write_path is not None:
                 file.write_on_file(stringURL)
                 file.write_on_file('\r\n')
                 file.write_on_file('\r\n')
