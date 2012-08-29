@@ -438,10 +438,15 @@ def get(url, timeout=30, **kwargs):
 
 
 def option_parser():
-    # python tsm.py --depth=3 --output=output.txt input.txt
-    # parse params
+    """
+    Parse params.
 
-    parser_ = OptionParser()
+    Example:
+    python tsm.py --depth=3 --output=output.txt input.txt
+    """
+
+    usage = "usage: %prog [options] inputfile"
+    parser_ = OptionParser(usage=usage)
     parser_.add_option("-d", "--depth", dest="depth",
         help="Level of depth on the net", metavar="number")
     parser_.add_option("-o", "--output", dest="output",
@@ -450,6 +455,10 @@ def option_parser():
         help="Location of file where save the alias-data", metavar="alias-location")
 
     (options, args) = parser_.parse_args()
+
+    if not len(args):
+        raise TypeError("inputfile is required")
+
     logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
         args[0])
 
@@ -514,9 +523,11 @@ def clear_site(url,base=' '):
 
     return site
 
+
 def absolutize(found_url,base_url):
     from urlparse import urljoin
     return urljoin(base_url, found_url).replace('/../', '/')
+
 
 def is_valid(url):
     """
@@ -600,31 +611,31 @@ def is_valid(url):
 
     try:
         get(url)
-
-    except requests.exceptions.ConnectionError:
+    except:
     #        server unreachable or nonexistent
+        logger.exception('Error getting %s', url)
         logger.warning(inv + 'server unreachable or nonexistent: %s', url)
         return False
 
-    except requests.exceptions.Timeout:
-    #        timeout link
-        logger.warning(inv + 'timeout link: %s', url)
-        return False
-
-    except UnicodeError:
-    #        fake link, or invalid extensions
-        logger.warning(inv + 'URL unacceptable: %s', url)
-        return False
-
-    except TypeError:
-    #        invalid extensions
-        logger.warning(inv + 'invalid extension: %s', url)
-        return False
-
-    except requests.exceptions.InvalidSchema:
-    #        HTML corrupted
-        logger.warning(inv + 'HTML corrupted: %s', url)
-        return False
+#    except requests.exceptions.Timeout:
+#    #        timeout link
+#        logger.warning(inv + 'timeout link: %s', url)
+#        return False
+#
+#    except UnicodeError:
+#    #        fake link, or invalid extensions
+#        logger.warning(inv + 'URL unacceptable: %s', url)
+#        return False
+#
+#    except TypeError:
+#    #        invalid extensions
+#        logger.warning(inv + 'invalid extension: %s', url)
+#        return False
+#
+#    except requests.exceptions.InvalidSchema:
+#    #        HTML corrupted
+#        logger.warning(inv + 'HTML corrupted: %s', url)
+#        return False
 
     return True
 
