@@ -64,7 +64,7 @@ class File(object):
         if n > self.n_alias:
             logger.info('Write alias file, path: %s', self.aliaslocation)
             file = open(self.aliaslocation, 'a')
-            file.writelines('N' + str(n) + ': ' + site.encode('utf-8') + '\r\n')
+            file.writelines('N{0}: {1}\r\n'.format(n, site.encode('utf-8')))
             file.close()
             self.n_alias += 1
 
@@ -147,12 +147,12 @@ class YahooAnswer(Parser):
 
 class TuristiPerCaso(Parser):
 #    regex rule
-    regex = re.compile('(https?://(www.)?)?turistipercaso.it/forum/')
+    regex = re.compile(r'(https?://(www.)?)?turistipercaso.it/forum/')
     html_parser = None
 
     def __init__(self, timeout=30):
         self.html_parser = HTMLParser.HTMLParser()
-        self.time = timeout
+        super(TuristiPerCaso, self).__init__(timeout)
 
     @staticmethod
     def a_valid(a):
@@ -446,7 +446,9 @@ class AlLink(Parser):
 # ----------------------------------
 
 def gen_hash(*args, **kwargs):
-    # hash file generator (for caching)
+    """
+    hash file generator (for caching)
+    """
 
     import cPickle as pickle
 
@@ -569,8 +571,10 @@ class Processor(object):
         return site
 
     def absolutize(self, found_url, base_url):
-    #        absolutize url
-    #        /contatti -> htto://www.google/contatti
+        """
+        Absolutize url:
+        /contatti -> htto://www.google/contatti
+        """
         from urlparse import urljoin
 
         return urljoin(base_url, found_url).replace('/../', '/')
@@ -612,7 +616,7 @@ class Processor(object):
             return False
 
             #   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
-        if  url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
+        if url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
         #        post reply / login page
             logger.warning(inv + 'post\'s reply or login page: (showthread or attachment): %s', url)
             return False
@@ -818,7 +822,7 @@ class Tsm(object):
                     stringURL += "     " + found_url
                 else:
                     index = process.index_site(found_url)
-                    stringURL += "  " + 'N{0}'.format(index)
+                    stringURL += '  N{0}'.format(index)
                     file.write_alias(index, process.siteslist[index])
 
             logger.critical(stringURL)
