@@ -656,47 +656,51 @@ class Processor(object):
             return False
 
         if s_path.find('/forum/p/abuse/') != -1:
-        #        popup login registration
+            # popup login registration
             logger.warning(inv + 'registration login: %s', s_path)
             return False
 
         try:
             get(url)
-
-        except requests.exceptions.ConnectionError:
-        #        server unreachable or nonexistent
+        except:
+            #        server unreachable or nonexistent
+            logger.exception('Error getting %s', url)
             logger.warning(inv + 'server unreachable or nonexistent: %s', url)
             return False
 
-        except requests.exceptions.Timeout:
-        #        timeout link
-            logger.warning(inv + 'timeout link: %s', url)
-            return False
-
-        except UnicodeError:
-        #        fake link, or invalid extensions
-            logger.warning(inv + 'URL unacceptable: %s', url)
-            return False
-
-        except TypeError:
-        #        invalid extensions
-            logger.warning(inv + 'invalid extension: %s', url)
-            return False
-
-        except requests.exceptions.InvalidSchema:
-        #        HTML corrupted
-            logger.warning(inv + 'HTML corrupted: %s', url)
-            return False
-
-        except requests.exceptions.TooManyRedirects:
-        #        redirections loop
-            logger.warning(inv + 'loop link redirections %s', url)
-            return False
-
-        except requests.exceptions.InvalidURL:
-        #        fake link
-            logger.warning(inv + 'URL unacceptable: %s', url)
-            return False
+#        except requests.exceptions.ConnectionError:
+#        #        server unreachable or nonexistent
+#            logger.warning(inv + 'server unreachable or nonexistent: %s', url)
+#            return False
+#
+#        except requests.exceptions.Timeout:
+#        #        timeout link
+#            logger.warning(inv + 'timeout link: %s', url)
+#            return False
+#
+#        except UnicodeError:
+#        #        fake link, or invalid extensions
+#            logger.warning(inv + 'URL unacceptable: %s', url)
+#            return False
+#
+#        except TypeError:
+#        #        invalid extensions
+#            logger.warning(inv + 'invalid extension: %s', url)
+#            return False
+#
+#        except requests.exceptions.InvalidSchema:
+#        #        HTML corrupted
+#            logger.warning(inv + 'HTML corrupted: %s', url)
+#            return False
+#        except requests.exceptions.TooManyRedirects:
+#        #        redirections loop
+#            logger.warning(inv + 'loop link redirections %s', url)
+#            return False
+#
+#        except requests.exceptions.InvalidURL:
+#        #        fake link
+#            logger.warning(inv + 'URL unacceptable: %s', url)
+#            return False
 
         return True
 
@@ -750,10 +754,13 @@ class Processor(object):
 
 class Tsm(object):
     def option_parser(self):
-    # python Tsm.py --depth=3 --output=output.txt input.txt
-    # parse params
+        """
+        Parse params
+        python Tsm.py --depth=3 --output=output.txt input.txt
+        """
 
-        parser_ = OptionParser()
+        usage = "usage: %prog [options] inputfile"
+        parser_ = OptionParser(usage=usage)
         parser_.add_option("-d", "--depth", dest="depth",
             help="Level of depth on the net", metavar="number")
         parser_.add_option("-o", "--output", dest="output",
@@ -762,6 +769,10 @@ class Tsm(object):
             help="Location of file where save the alias-data", metavar="alias-location")
 
         (options, args) = parser_.parse_args()
+
+        if not len(args):
+            raise TypeError("inputfile is required")
+
         logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
             args[0])
 
