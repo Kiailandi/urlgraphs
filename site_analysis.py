@@ -536,8 +536,10 @@ class Processor(object):
             if not url:
                 continue
             if self.is_valid(url):
-                self.siteslist.append(self.clear_site(url))
-                self.jobs[1].append(self.clear_site(url))
+                url = self.clear_site(url)
+
+                self.siteslist.append(url)
+                self.jobs[1].append(url)
 
     # ---------------------------------
 
@@ -568,7 +570,7 @@ class Processor(object):
         if url.endswith('print/'):
             url = url.replace('print/', '')
 
-            #   replace '' (space) with %20
+        #   replace '' (space) with %20
         s = urlparse(url.replace(' ', '%20'))
 
         logger.info('urlparse: %s', s)
