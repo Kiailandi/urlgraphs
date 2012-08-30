@@ -381,8 +381,6 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
                 return True
                 #        except:
                 #            return False
-        else:
-            return False
 
         return False
 
@@ -436,6 +434,7 @@ class GenericLink(Parser):
         except requests.exceptions.Timeout:
             logger.warning('Invalid URL, Diffbot is taking too long for the answer, skip %s', url)
             return
+
         try:
             doc = etree.fromstring(xmlanswer.encode('utf-8'))
             for link in doc.iterfind('.//link'):
@@ -574,16 +573,14 @@ class Processor(object):
         s = urlparse(url.replace(' ', '%20'))
 
         logger.info('urlparse: %s', s)
-        if s.query == '':
-            try:
-                site = s.scheme + '://' + s.hostname + s.path
-            except TypeError:
-                site = 'http://' + s.path
-        else:
-            try:
-                site = s.scheme + '://' + s.hostname + s.path + '?' + s.query
-            except TypeError:
-                site = 'http://' + s.path + '?' + s.query
+
+        try:
+            site = s.scheme + '://' + s.hostname + s.path
+        except TypeError:
+            site = 'http://' + s.path
+
+        if s.query:
+            site += '?' + s.query
 
         return site
 
