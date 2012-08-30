@@ -1,16 +1,17 @@
 from itertools import chain
-import requests
 import re
 import os
 import logging
 from xml.etree import cElementTree as etree
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from optparse import OptionParser
 from urlparse import urlparse
 from bz2 import BZ2File
-from bs4 import BeautifulSoup
 #import pdb
 import HTMLParser
+
+from bs4 import BeautifulSoup
+import requests
 
 # logging level initialization
 logger = logging.getLogger('debug_application')
@@ -69,6 +70,19 @@ class File(object):
             self.n_alias += 1
 
 
+def get_soup_from_url(url, _cache=OrderedDict()):
+    hash_ = hash(url)
+    try:
+        return _cache[hash_]
+    except KeyError:
+        page = get(url)
+        soup = BeautifulSoup(page, "lxml")
+        _cache[hash_] = soup
+        if len(_cache) > 100:
+            _cache.popitem(last=False)
+        return soup
+
+
 class DefSites(object):
     # sites' rules
 
@@ -104,8 +118,7 @@ class Parser(object):
 
 class YahooAnswer(Parser):
     def yahoo_page_parser(self, url):
-        page = get(url, self.timeout)
-        page_soup = BeautifulSoup(page, "lxml")
+        page_soup = get_soup_from_url(url)
         # section
         thread_topics = page_soup.find('ul', {"class": "questions"})
         # topic and section
@@ -208,8 +221,7 @@ class TuristiPerCaso(Parser):
     def run(self, url, with_user=False):
     #        run TuristiPerCaso rules
         logger.info('Run TuristiPerCaso rules of the site: %s', url)
-        page = get(url, self.timeout)
-        text_soup = BeautifulSoup(page, "lxml")
+        text_soup = get_soup_from_url(url)
         f_section = text_soup.find('ol', {"class": "thread"})
         if f_section is not None:
             a_list = chain.from_iterable(
@@ -276,8 +288,7 @@ class VBulletin_Section(Parser):
     def match(self, url):
     #   found if is a VBulletin section
         logger.info('Check VBulletin section rules of the site: %s', url)
-        page = get(url, self.timeout)
-        section_soup = BeautifulSoup(page, "lxml")
+        section_soup = get_soup_from_url(url)
         html = section_soup.find('html')
         if html is not None:
             f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
@@ -288,19 +299,25 @@ class VBulletin_Section(Parser):
 
         return False
 
-    def found_topic_url(self, div):
-    #   found by how many topic is composed the forum section
+    def find_topic_url(self, div):
+        """
+        find how many topic compose this forum section
+        """
         for topic in div.find_all('a', {"class": "title"}):
             yield topic.get('href')
 
-    def found_topic_pagination(self, div):
-    #   found if is use a pagination for the topic
+    def find_topic_pagination(self, div):
+        """
+        find if there is a pagination for the topic
+        """
         for page in div.find_all('span', {"class": "pagelinks"}): #<span class="pagelinks">
             for url_topic in page.find_all('a'):
                 yield url_topic.get('href')
 
-    def found_section_pagination(self, text_soup):
-    #   found if is use a pagination for the section
+    def find_section_pagination(self, text_soup):
+        """
+        find if there's pagination in this section
+        """
         span_pages = text_soup.find('span', {"class": "selected"})
         if span_pages is not None:
             for url_page in span_pages.find_all('a'):
@@ -309,20 +326,19 @@ class VBulletin_Section(Parser):
     def run(self, url):
     #   start VBulletin rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        page = get(url, self.timeout)
-        text_soup = BeautifulSoup(page, "lxml")
+        text_soup = get_soup_from_url(url)
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
-        for a in self.found_section_pagination(text_soup):
+        for a in self.find_section_pagination(text_soup):
             yield a
 
         for div in div_lists:
             cnt = 0
-            for cnt, url in enumerate(self.found_topic_pagination(div)):
+            for cnt, url in enumerate(self.find_topic_pagination(div)):
                 yield url
 
             # if no pagination is a single topic, url
             if not cnt:
-                for url in self.found_topic_url(div):
+                for url in self.find_topic_url(div):
                     yield url
 
 
@@ -352,10 +368,11 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
     """
 
     def match(self, url):
-    #   found if is a VBulletin topic
+        """
+        find if it's a VBulletin topic
+        """
         logger.info('Check VBulletin topic rules of the site: %s', url)
-        page = get(url, self.timeout)
-        topic_soup = BeautifulSoup(page, "lxml")
+        topic_soup = get_soup_from_url(url)
         html = topic_soup.find('html')
         if html is not None:
             f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
@@ -388,8 +405,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
     def run(self, url):
     #        run VBulletin section rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        page = get(url, self.timeout)
-        text_soup = BeautifulSoup(page, "lxml")
+        text_soup = get_soup_from_url(url)
         for page_link in self.messages_url(text_soup):
             yield page_link
         for pages in self.found_pages(text_soup):
@@ -437,8 +453,7 @@ class AlLink(Parser):
     # list of link
     def run(self, url):
         logger.info('Run AlLink on site: %s', url)
-        page = get(url, self.timeout)
-        text_soup = BeautifulSoup(page, "lxml")
+        text_soup = get_soup_from_url(url)
         a_lists = text_soup.find_all('a') # a list
         for a in a_lists:
             yield a.get('href')
@@ -480,16 +495,16 @@ def get(url, timeout=30, **kwargs):
 
 class Processor(object):
 #    links search engine
-    depthRoot = 1
+    depth_root = 1
     current_depth = 1
     siteslist = []
-    defSite = DefSites()
+    def_site = DefSites()
     jobs = defaultdict(list)
 
-    #   Init Engine, templist and depthRoot required
+    #   Init Engine, templist and depth_root required
     def __init__(self,
                  templist,
-                 depthRoot,
+                 depth_root,
                  __VBulletin_Section=False,
                  __VBulletin_Topic=False,
                  __YahooAnswer=False,
@@ -500,19 +515,19 @@ class Processor(object):
         timeout = int(timeout)
         # parser define
         if __VBulletin_Section:
-            self.defSite.register(VBulletin_Section(timeout))
+            self.def_site.register(VBulletin_Section(timeout))
         if __VBulletin_Topic:
-            self.defSite.register(VBulletin_Topic(timeout))
+            self.def_site.register(VBulletin_Topic(timeout))
         if __YahooAnswer:
-            self.defSite.register(YahooAnswer(timeout))
+            self.def_site.register(YahooAnswer(timeout))
         if __TuristiPerCaso:
-            self.defSite.register(TuristiPerCaso(timeout))
+            self.def_site.register(TuristiPerCaso(timeout))
         if __GenericLink:
-            self.defSite.register(GenericLink(timeout))
+            self.def_site.register(GenericLink(timeout))
         if __AlLink:
-            self.defSite.register(AlLink(timeout))
+            self.def_site.register(AlLink(timeout))
 
-        self.depthRoot = depthRoot
+        self.depth_root = depth_root
         self.siteslist_initialization(templist)
 
     def siteslist_initialization(self, templist):
@@ -714,7 +729,7 @@ class Processor(object):
                 logger.info('found_url: %s', found_url)
                 if self.index_site(found_url) == -1:
                     self.siteslist.append(found_url)
-                    if self.current_depth < self.depthRoot:
+                    if self.current_depth < self.depth_root:
                         self.jobs[self.current_depth + 1].append(found_url)
                 yield found_url
 
@@ -734,7 +749,7 @@ class Processor(object):
             while True:
                 try:
                     url = self.jobs[self.current_depth].pop()
-                    parser = self.defSite.get_parser_for(url)
+                    parser = self.def_site.get_parser_for(url)
                     logger.info('Site under analysis: %s', url)
                     logger.info('Depth: %d', self.current_depth)
                     url_list = []
@@ -780,22 +795,22 @@ class Tsm(object):
 
         # check option (depth)
         if options.depth is None or options.depth <= 0:
-            depthRoot = 1
+            depth_root = 1
         else:
-            depthRoot = int(options.depth)
+            depth_root = int(options.depth)
 
         write_path = options.output
         alias_location = options.alias
         read_path = args[0]
 
-        return depthRoot, write_path, read_path, alias_location
+        return depth_root, write_path, read_path, alias_location
 
     # ----------MAIN -------------
 
     def main_tsm(self):
         # DEVELOP BRANCH
 
-        depthRoot, write_path, read_path, alias_location = self.option_parser()
+        depth_root, write_path, read_path, alias_location = self.option_parser()
         file = File(read_path, write_path, alias_location)
         if write_path is not None:
             try:
@@ -805,7 +820,7 @@ class Tsm(object):
                 pass
 
         temp = file.load_file()
-        process = Processor(temp, depthRoot, True, True, True, True, True, False, 30)
+        process = Processor(temp, depth_root, True, True, True, True, True, False, 30)
 
         if alias_location is not None and write_path is not None:
             for i, site in enumerate(process.siteslist):
