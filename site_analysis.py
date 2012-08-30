@@ -18,7 +18,7 @@ logger = logging.getLogger('debug_application')
 logger.setLevel(logging.DEBUG)
 # file handler
 fdh = logging.FileHandler('debug.log')
-fdh.setLevel(logging.DEBUG)
+fdh.setLevel(logging.INFO)
 file_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fdh.setFormatter(file_log_formatter)
 # console handler
@@ -33,6 +33,9 @@ logger.addHandler(cwh)
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
+THREADED = True
+WORKERS = 10
+
 
 try:
     os.mkdir(CACHE_PATH)
@@ -91,7 +94,10 @@ class DefSites(object):
 
     def register(self, parser):
         logger.info('Register Parser: %s', parser)
-        assert isinstance(parser, Parser), "Mi aspettavo un parser, mi hai passato un {0}".format(type(parser))
+        assert isinstance(parser, Parser), \
+            "Mi aspettavo un parser, mi hai passato un {0}".format(
+                type(parser)
+            )
         self.urlDefRegistry.append(parser)
 
     # found site's parser
@@ -475,21 +481,73 @@ def get(url, timeout=30, **kwargs):
     hash_ = gen_hash(url, kwargs)
     filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
 
+    if THREADED:
+        import time
+        from redis import Redis
+
+        lock = 'LOCK:{0}'.format(hash_)
+        red = Redis()
+        while True:
+            locked = red.setnx(lock, 1)
+
+            if locked:
+                logger.info('Locked url: %s', url)
+
+                red.expire(lock, 32)
+                break
+            logger.info('Not locked url: %s', url)
+
+            time.sleep(1)
+
     # search in cache
     try:
         with BZ2File(filename, 'rb') as f:
             logger.info('Found in cache: %s', url)
-            return f.read().decode('utf-8')
+            content = f.read().decode('utf-8')
+            if THREADED:
+                # release the lock
+                red.delete(lock)
+            return content
+
     except IOError:
         pass
 
     logger.info('Not in cache: %s', url)
+
     text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
     with BZ2File(filename, 'wb') as f:
         f.write(text.encode('utf-8'))
 
+    if THREADED:
+        # release the lock
+        red.delete(lock)
+
     return text
+
+
+import threading
+
+class UrlGetWorker(threading.Thread):
+    def __init__(self, queue, name):
+        super(UrlGetWorker, self).__init__()
+
+        self.queue = queue
+        self.name = name
+
+    def run(self):
+        while True:
+            try:
+                url = self.queue.get(True, 2)
+            except:
+                pass
+            else:
+                if url is None:
+                    return
+
+                logger.info('Thread %s gets url %s', self.name, url)
+                get(url)
+                self.queue.task_done()
 
 
 class Processor(object):
@@ -526,6 +584,22 @@ class Processor(object):
         if __AlLink:
             self.def_site.register(AlLink(timeout))
 
+        if THREADED:
+            from Queue import Queue
+            self.url_queue = Queue()
+
+            # clean locks
+            from redis import Redis
+            red = Redis()
+            for k in red.keys('LOCK:*'):
+                logger.info('Remove key %s', k)
+                red.delete(k)
+
+            for i in range(10):
+                worker = UrlGetWorker(self.url_queue, i)
+                worker.setDaemon(True)
+                worker.start()
+
         self.depth_root = depth_root
         self.siteslist_initialization(templist)
 
@@ -539,6 +613,8 @@ class Processor(object):
 
                 self.siteslist.append(url)
                 self.jobs[1].append(url)
+                if THREADED:
+                    self.url_queue.put(url)
 
     # ---------------------------------
 
@@ -730,6 +806,8 @@ class Processor(object):
                     self.siteslist.append(found_url)
                     if self.current_depth < self.depth_root:
                         self.jobs[self.current_depth + 1].append(found_url)
+                        if THREADED:
+                            self.url_queue.put(found_url)
                 yield found_url
 
     def analysis(self):
