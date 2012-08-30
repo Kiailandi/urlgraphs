@@ -34,7 +34,7 @@ logger.addHandler(cwh)
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
 THREADED = True
-WORKERS = 10
+WORKERS = 20
 
 
 try:
@@ -516,7 +516,7 @@ def get(url, timeout=30, **kwargs):
 
     text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
-    with BZ2File(filename, 'wb') as f:
+    with BZ2File(filename, 'wb', compresslevel=1) as f:
         f.write(text.encode('utf-8'))
 
     if THREADED:
@@ -542,9 +542,8 @@ class UrlGetWorker(threading.Thread):
             except:
                 pass
             else:
-                if url is None:
-                    return
-
+#                if url is None:
+#                    return
                 logger.info('Thread %s gets url %s', self.name, url)
                 get(url)
                 self.queue.task_done()
