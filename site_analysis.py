@@ -725,16 +725,21 @@ class Processor(object):
             logger.warning(inv + 'javascript URL: %s', url)
             return False
 
-            #   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
+        #   http://www.fassaforum.com/attachment.php?s=0f2a782eb8404a03f30d91df3d7f7ca5&attachmentid=702&d=1280593484
         if url.find('showthread.php') != -1 or url.find('attachment.php') != -1:
         #        post reply / login page
             logger.warning(inv + 'post\'s reply or login page: (showthread or attachment): %s', url)
             return False
 
-            #    http://www.forumviaggiatori.com/members/norman+wells.htm
+        # http://www.forumviaggiatori.com/members/norman+wells.htm
         if url.find('/members/') != -1:
         #        user login page
             logger.warning(inv + 'user login page: %s', url)
+            return False
+
+        # http://s3.mediastreaming.it/mobile.php?port=9022
+        if url.find('streaming') != -1:
+            logger.warning(inv + 'it\'s a streaming: %s', url)
             return False
 
         if url.endswith('?popup'):
