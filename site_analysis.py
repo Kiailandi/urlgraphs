@@ -87,6 +87,22 @@ def get_soup_from_url(url, _cache=OrderedDict()):
         return soup
 
 
+def get_lxml_doc_from_url(url, _cache=OrderedDict()):
+    from lxml.html import document_fromstring
+    logger.warning('Getting lxml doc')
+
+    hash_ = hash(url)
+    try:
+        return _cache[hash_]
+    except KeyError:
+        page = get(url)
+        soup = document_fromstring(page)
+        _cache[hash_] = soup
+        if len(_cache) > 100:
+            _cache.popitem(last=False)
+        return soup
+
+
 class DefSites(object):
     # sites' rules
 
@@ -468,8 +484,13 @@ def gen_hash(*args, **kwargs):
     return str(abs(hash(pickle.dumps((args, kwargs)))))
 
 
-def get(url, timeout=30, **kwargs):
+def get(url, timeout=30, _counter=[0], **kwargs):
     import lz4
+
+    if _counter[0] > 200:
+        exit()
+
+    _counter[0] += 1
 
     logger.warning('Getting url %s', url)
     # hash request
