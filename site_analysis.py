@@ -573,6 +573,7 @@ class Processor(object):
     siteslist = []
     def_site = DefSites()
     jobs = defaultdict(deque)
+    current_job_index = 0
 
     #   Init Engine, templist and depth_root required
     def __init__(self,
@@ -849,9 +850,14 @@ class Processor(object):
             while True:
                 try:
                     url = self.jobs[self.current_depth].popleft()
+                    self.current_job_index += 1
                     parser = self.def_site.get_parser_for(url)
                     logger.critical('Site under analysis: %s', url)
-                    logger.critical('Depth: %d', self.current_depth)
+                    logger.critical(
+                        'Depth: %d. Current job: %d',
+                        self.current_depth,
+                        self.current_job_index
+                    )
                     url_list = []
                     for found_url in self.run(url, parser):
                         url_list.append(found_url)
