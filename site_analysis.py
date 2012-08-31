@@ -3,7 +3,7 @@ import re
 import os
 import logging
 from xml.etree import cElementTree as etree
-from collections import defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict, deque
 from optparse import OptionParser
 from urlparse import urlparse
 from bz2 import BZ2File
@@ -18,7 +18,7 @@ logger = logging.getLogger('debug_application')
 logger.setLevel(logging.DEBUG)
 # file handler
 fdh = logging.FileHandler('debug.log')
-fdh.setLevel(logging.INFO)
+fdh.setLevel(logging.WARNING)
 file_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fdh.setFormatter(file_log_formatter)
 # console handler
@@ -74,6 +74,7 @@ class File(object):
 
 
 def get_soup_from_url(url, _cache=OrderedDict()):
+    logger.warning('Getting soup')
     hash_ = hash(url)
     try:
         return _cache[hash_]
@@ -476,7 +477,7 @@ def gen_hash(*args, **kwargs):
 
 
 def get(url, timeout=30, **kwargs):
-    logger.info('Getting url %s', url)
+    logger.warning('Getting url %s', url)
     # hash request
     hash_ = gen_hash(url, kwargs)
     filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
@@ -538,13 +539,14 @@ class UrlGetWorker(threading.Thread):
     def run(self):
         while True:
             try:
-                url = self.queue.get(True, 2)
+                url = self.queue.get(True, 10)
             except:
+                logger.warning('Thread %s has nothing to do', self.name)
                 pass
             else:
 #                if url is None:
 #                    return
-                logger.info('Thread %s gets url %s', self.name, url)
+                logger.warning('Thread %s gets url %s', self.name, url)
                 get(url)
                 self.queue.task_done()
 
@@ -555,7 +557,7 @@ class Processor(object):
     current_depth = 1
     siteslist = []
     def_site = DefSites()
-    jobs = defaultdict(list)
+    jobs = defaultdict(deque)
 
     #   Init Engine, templist and depth_root required
     def __init__(self,
@@ -611,11 +613,15 @@ class Processor(object):
                 url = self.clear_site(url)
 
                 self.siteslist.append(url)
-                self.jobs[1].append(url)
-                if THREADED:
-                    self.url_queue.put(url)
+                self.analyze_this(url, 1)
 
     # ---------------------------------
+
+    def analyze_this(self, url, depth):
+        logger.warning('New link to analyze %s', url)
+        self.jobs[depth].append(url)
+        if THREADED:
+            self.url_queue.put(url)
 
     def index_site(self, url):
         """
@@ -804,9 +810,7 @@ class Processor(object):
                 if self.index_site(found_url) == -1:
                     self.siteslist.append(found_url)
                     if self.current_depth < self.depth_root:
-                        self.jobs[self.current_depth + 1].append(found_url)
-                        if THREADED:
-                            self.url_queue.put(found_url)
+                        self.analyze_this(found_url, self.current_depth + 1)
                 yield found_url
 
     def analysis(self):
@@ -824,7 +828,7 @@ class Processor(object):
         while True:
             while True:
                 try:
-                    url = self.jobs[self.current_depth].pop()
+                    url = self.jobs[self.current_depth].popleft()
                     parser = self.def_site.get_parser_for(url)
                     logger.info('Site under analysis: %s', url)
                     logger.info('Depth: %d', self.current_depth)
@@ -916,7 +920,7 @@ class Tsm(object):
                     stringURL += '  N{0}'.format(index)
                     file.write_alias(index, process.siteslist[index])
 
-            logger.critical(stringURL)
+#            logger.critical(stringURL)
             if write_path is not None:
                 file.write_on_file(stringURL)
                 file.write_on_file('\r\n')
