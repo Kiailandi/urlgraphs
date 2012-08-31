@@ -207,9 +207,11 @@ class TestYahooAnswer(unittest.TestCase):
                          , 20)
 
     def test_Yahoo_Answer_parser_threads(self):
-        self.assertIsNone(self.ya.yahoo_page_parser(
-            'http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO')[
-                          0])
+        self.assertFalse(
+            self.ya.yahoo_page_parser(
+                'http://it.answers.yahoo.com/question/index?qid=20120617101809AAaPAeO'
+            )[0]
+        )
         thread_topics, messages_topic = self.ya.yahoo_page_parser(
             'http://it.answers.yahoo.com/dir/index;_ylt=AlfwvVcRJfbSNGQd1gwtODlGWH1G;_ylv=3?sid=396546975&link=resolved#yan-questions')
         self.assertEqual(len(list(self.ya.found_thread_topics(thread_topics))),

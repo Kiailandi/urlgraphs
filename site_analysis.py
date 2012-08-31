@@ -141,11 +141,11 @@ class Parser(object):
 
 class YahooAnswer(Parser):
     def yahoo_page_parser(self, url):
-        page_soup = get_soup_from_url(url)
+        page_soup = get_lxml_doc_from_url(url)
         # section
-        thread_topics = page_soup.find('ul', {"class": "questions"})
+        thread_topics = page_soup.cssselect('ul.questions')
         # topic and section
-        messages_topic = page_soup.find('div', {"id": "yan-content"})
+        messages_topic = page_soup.cssselect('div#yan-content')
         return thread_topics, messages_topic
 
     def match(self, url):
@@ -153,27 +153,28 @@ class YahooAnswer(Parser):
         logger.info('Check if is a Yahoo page: %s', url)
         if url.find('.yahoo.com') != -1:
             thread_topics, message_topic = self.yahoo_page_parser(url)
-            if thread_topics is not None or message_topic is not None:
+            if thread_topics or message_topic:
                 return  True
 
         return False
 
     def found_thread_topics(self, section_topics):
     #        found thread questions in section
-        h3_list = section_topics.findAll('h3')
-        for h3 in h3_list:
-            yield 'http://it.answers.yahoo.com/' + h3.find('a').get('href')
+        for topic in section_topics:
+            for h3 in topic.cssselect('h3'):
+                yield 'http://it.answers.yahoo.com/' + h3.cssselect('a')[0].attrib.get('href')
 
     def found_messages_topic(self, topic_messages):
     #        found messages in the topic question
-        a_list = topic_messages.findAll('a', {'rel': 'nofollow'})
-        for a in a_list:
-            yield a.get('href')
+        for topic in topic_messages:
+            a_list = topic.find_rel_links('nofollow')
+            for a in a_list:
+                yield a.attrib.get('href')
 
     def run(self, url):
     #        start Yahoo answer rule
         thread_topics, messages_topic = self.yahoo_page_parser(url)
-        if thread_topics is not None:
+        if thread_topics:
             for a in self.found_thread_topics(thread_topics):
                 yield a
         else:
