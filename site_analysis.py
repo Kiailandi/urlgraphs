@@ -33,7 +33,7 @@ logger.addHandler(cwh)
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
 THREADED = False
-WORKERS = 4
+WORKERS = 2
 
 
 try:
@@ -507,7 +507,7 @@ def get(url, timeout=30, _counter=[0], **kwargs):
                 break
             logger.info('Not locked url: %s', url)
 
-            time.sleep(1)
+            time.sleep(0.1)
 
     # search in cache
     try:
@@ -839,8 +839,8 @@ class Processor(object):
                 try:
                     url = self.jobs[self.current_depth].popleft()
                     parser = self.def_site.get_parser_for(url)
-                    logger.info('Site under analysis: %s', url)
-                    logger.info('Depth: %d', self.current_depth)
+                    logger.critical('Site under analysis: %s', url)
+                    logger.critical('Depth: %d', self.current_depth)
                     url_list = []
                     for found_url in self.run(url, parser):
                         url_list.append(found_url)
