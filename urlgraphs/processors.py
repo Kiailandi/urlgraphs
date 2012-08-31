@@ -249,10 +249,10 @@ class Processor(object):
         """
         engine 'Main':
         - pop url
-        - found parser
-        - found url and append in a list
+        - find parser
+        - find url and append in a list
         - yield tupla : (base url, [list of url])
-        - incrementing current deep
+        - increment current depth
         - fake tupla -> finish
         """
         logger.info('URL-Graphs --- START --- v3.1.0')
@@ -263,8 +263,8 @@ class Processor(object):
                     url = self.jobs[self.current_depth].popleft()
                     self.current_job_index += 1
 
-                    if self.current_job_index > 200:
-                        exit()
+#                    if self.current_job_index > 200:
+#                        exit()
                     parser = self.site.get_parser_for(url)
                     logger.critical('Site under analysis: %s', url)
                     logger.critical(

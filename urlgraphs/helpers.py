@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 from urlgraphs import logger, CACHE_PATH
 
 
-
 def gen_hash(*args, **kwargs):
     """
     hash file generator (for caching)

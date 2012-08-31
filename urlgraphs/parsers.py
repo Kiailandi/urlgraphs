@@ -5,7 +5,7 @@ import requests
 from lxml import etree
 
 from urlgraphs import logger
-from urlgraphs.helpers import get_soup_from_url, get_lxml_doc_from_url, get
+from urlgraphs.helpers import get_soup_from_url, get
 
 
 class Parser(object):

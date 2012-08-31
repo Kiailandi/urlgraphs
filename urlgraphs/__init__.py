@@ -94,7 +94,12 @@ class File(object):
 
 
 class Tsm(object):
-    def option_parser(self):
+    def __init__(self):
+        from collections import defaultdict
+
+        self.edges = defaultdict(list)
+
+    def parse_options(self):
         """
         Parse params
         python Tsm.py --depth=3 --output=output.txt input.txt
@@ -102,12 +107,26 @@ class Tsm(object):
 
         usage = "usage: %prog [options] inputfile"
         parser_ = OptionParser(usage=usage)
-        parser_.add_option("-d", "--depth", dest="depth",
-            help="Level of depth on the net", metavar="number")
-        parser_.add_option("-o", "--output", dest="output",
-            help="Location of file where save the data", metavar="data-location")
-        parser_.add_option("-a", "--alias", dest="alias",
-            help="Location of file where save the alias-data", metavar="alias-location")
+        parser_.add_option(
+            "-d", "--depth", dest="depth",
+            help="Level of depth on the net", metavar="number"
+        )
+        parser_.add_option(
+            "-o", "--output", dest="output",
+            help="Location of file where save the data",
+            metavar="data-location"
+        )
+        parser_.add_option(
+            "-a", "--alias", dest="alias",
+            help="Location of file where save the alias-data",
+            metavar="alias-location"
+        )
+        parser_.add_option(
+            "--hostnames", dest="use_hostnames",
+            help="Create a hostname network instead of a URL network",
+            action="store_true",
+            default=False,
+        )
 
         (options, args) = parser_.parse_args()
 
@@ -126,30 +145,29 @@ class Tsm(object):
         else:
             depth_root = int(options.depth)
 
-        write_path = options.output
-        alias_location = options.alias
-        read_path = args[0]
+        self.output_path = options.output
+        self.alias_path = options.alias
+        self.input_path = args[0]
+        self.use_hostnames = options.use_hostnames
+        self.max_depth = depth_root
 
-        return depth_root, write_path, read_path, alias_location
-
-    # ----------MAIN -------------
-
-    def main_tsm(self):
+    def run(self):
         from urlgraphs.processors import Processor
 
-        depth_root, write_path, read_path, alias_location = self.option_parser()
-        file = File(read_path, write_path, alias_location)
-        if write_path is not None:
-            try:
-                os.remove(write_path)
-                os.remove(alias_location)
-            except OSError:
-                pass
+        self.parse_options()
+        self.file = File(self.input_path, self.output_path, self.alias_path)
 
-        temp = file.load_file()
-        process = Processor(
+        for path in (self.output_path, self.alias_path):
+            if path:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+        temp = self.file.load_file()
+        self.process = Processor(
             temp,
-            depth_root,
+            self.max_depth,
             True,
             True,
             True,
@@ -159,31 +177,58 @@ class Tsm(object):
             30
         )
 
-        if alias_location is not None and write_path is not None:
-            for i, site in enumerate(process.linklist):
-                file.write_alias(i, site)
+        for source, dests in self.process.analysis():
+            self.elaborate_edges(source, dests)
 
-        for tupla_url in process.analysis():
-            if alias_location is not None:
-                stringURL = 'N{0}'.format(process.link_index(tupla_url[0]))
-            else:
-                stringURL = tupla_url[0]
+        self.close()
 
-            for found_url in tupla_url[1]:
-                if alias_location is None:
-                    stringURL += "     " + found_url
-                else:
-                    index = process.link_index(found_url)
-                    stringURL += '  N{0}'.format(index)
-                    file.write_alias(index, process.linklist[index])
+    def elaborate_edges(self, source, dests):
+        self.edges[source] = dests
 
-#            logger.critical(stringURL)
-            if write_path is not None:
-                file.write_on_file(stringURL)
-                file.write_on_file('\r\n')
-                file.write_on_file('\r\n')
+    def close(self):
+        from collections import defaultdict
+
+        def hostname(url):
+            from urlparse import urlparse
+
+            return urlparse(url).hostname
+
+        if self.use_hostnames:
+            hostname_edges = defaultdict(list)
+
+            for source, dests in self.edges.iteritems():
+                hostname_edges[hostname(source)] += map(hostname, dests)
+
+            # sort and create the new index
+            hostnames = set()
+            for source in hostname_edges.iterkeys():
+                new_edges = sorted(hostname_edges[source])
+                hostname_edges[source] = new_edges
+                hostnames.update(new_edges + [source])
+
+            self.edges = hostname_edges
+            index = list(hostnames)
+        else:
+            index = self.process.linklist
+
+        if self.alias_path:
+            for i, site in enumerate(index):
+                self.file.write_alias(i, site)
+
+        for source, dests in self.edges.iteritems():
+            self.file.write_on_file(
+                'N{0}  '.format(index.index(source))
+            )
+            self.file.write_on_file(
+                '  '.join([
+                    'N{0}'.format(index.index(dest))
+                    for dest in dests
+                ])
+            )
+            self.file.write_on_file('\r\n')
+            self.file.write_on_file('\r\n')
 
 
 if __name__ == "__main__":
     tsm = Tsm()
-    tsm.main_tsm()
+    tsm.run()
