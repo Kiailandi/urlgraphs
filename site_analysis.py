@@ -488,7 +488,7 @@ def get(url, timeout=30, **kwargs):
             if locked:
                 logger.info('Locked url: %s', url)
 
-                red.expire(lock, 32)
+                red.expire(lock, 30 + 2)
                 break
             logger.info('Not locked url: %s', url)
 
@@ -590,7 +590,7 @@ class Processor(object):
                 logger.info('Remove key %s', k)
                 red.delete(k)
 
-            for i in range(10):
+            for i in range(WORKERS):
                 worker = UrlGetWorker(self.url_queue, i)
                 worker.setDaemon(True)
                 worker.start()
