@@ -245,9 +245,9 @@ class TestProcessor(unittest.TestCase):
         )
 
     def test_index_site(self):
-        self.assertEqual(self.process.index_site('http://www.google.it/'), -1)
+        self.assertEqual(self.process.link_index('http://www.google.it/'), -1)
         self.assertEqual(
-            self.process.index_site(
+            self.process.link_index(
                 'http://forum.zingarate.com/campo-tures-59705.html'
             ),
             0

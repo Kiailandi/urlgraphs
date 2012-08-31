@@ -31,7 +31,10 @@ logger.addHandler(cwh)
 
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
-CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
+CACHE_PATH = os.environ.get(
+    'CACHE_PATH',
+    os.path.join(os.path.dirname(__file__), '.cache')
+)
 THREADED = False
 WORKERS = 2
 
@@ -570,7 +573,7 @@ class Processor(object):
 #    links search engine
     depth_root = 1
     current_depth = 1
-    siteslist = []
+    linklist = []
     def_site = DefSites()
     jobs = defaultdict(deque)
     current_job_index = 0
@@ -618,9 +621,9 @@ class Processor(object):
                 worker.start()
 
         self.depth_root = depth_root
-        self.siteslist_initialization(templist)
+        self.linklist_initialization(templist)
 
-    def siteslist_initialization(self, templist):
+    def linklist_initialization(self, templist):
         for url in templist:
             url = url.strip()
             if not url:
@@ -628,7 +631,7 @@ class Processor(object):
             if self.is_valid(url):
                 url = self.clear_site(url)
 
-                self.siteslist.append(url)
+                self.linklist.append(url)
                 self.analyze_this(url, 1)
 
     # ---------------------------------
@@ -639,17 +642,15 @@ class Processor(object):
         if THREADED:
             self.url_queue.put(url)
 
-    def index_site(self, url):
+    def link_index(self, url):
         """
         return the index of the 'url' in the sites_list
-        if doesn't exists add him
         """
-        logger.info('Check number for url: %s', url)
+#        logger.info('Check number for url: %s', url)
         try:
-            return self.siteslist.index(url)
+            return self.linklist.index(url)
         except ValueError:
             return -1
-
 
     def clear_site(self, url, base=' '):
         # formatting and clearing url
@@ -828,8 +829,8 @@ class Processor(object):
             found_url = self.clear_site(found_url, url)
             if self.is_valid(found_url):
                 logger.info('found_url: %s', found_url)
-                if self.index_site(found_url) == -1:
-                    self.siteslist.append(found_url)
+                if self.link_index(found_url) == -1:
+                    self.linklist.append(found_url)
                     if self.current_depth < self.depth_root:
                         self.analyze_this(found_url, self.current_depth + 1)
                 yield found_url
@@ -851,6 +852,9 @@ class Processor(object):
                 try:
                     url = self.jobs[self.current_depth].popleft()
                     self.current_job_index += 1
+
+                    if self.current_job_index > 200:
+                        exit()
                     parser = self.def_site.get_parser_for(url)
                     logger.critical('Site under analysis: %s', url)
                     logger.critical(
@@ -896,8 +900,11 @@ class Tsm(object):
         if not len(args):
             raise TypeError("inputfile is required")
 
-        logger.info('Params: depth= %s, output=%s, alias=%s, read=%s', options.depth, options.output, options.alias,
-            args[0])
+        logger.info(
+            'Params: depth= %s, output=%s, alias=%s, read=%s',
+            options.depth, options.output, options.alias,
+            args[0]
+        )
 
         # check option (depth)
         if options.depth is None or options.depth <= 0:
@@ -926,15 +933,25 @@ class Tsm(object):
                 pass
 
         temp = file.load_file()
-        process = Processor(temp, depth_root, True, True, True, True, True, False, 30)
+        process = Processor(
+            temp,
+            depth_root,
+            True,
+            True,
+            True,
+            True,
+            True,
+            False,
+            30
+        )
 
         if alias_location is not None and write_path is not None:
-            for i, site in enumerate(process.siteslist):
+            for i, site in enumerate(process.linklist):
                 file.write_alias(i, site)
 
         for tupla_url in process.analysis():
             if alias_location is not None:
-                stringURL = 'N{0}'.format(process.index_site(tupla_url[0]))
+                stringURL = 'N{0}'.format(process.link_index(tupla_url[0]))
             else:
                 stringURL = tupla_url[0]
 
@@ -942,9 +959,9 @@ class Tsm(object):
                 if alias_location is None:
                     stringURL += "     " + found_url
                 else:
-                    index = process.index_site(found_url)
+                    index = process.link_index(found_url)
                     stringURL += '  N{0}'.format(index)
-                    file.write_alias(index, process.siteslist[index])
+                    file.write_alias(index, process.linklist[index])
 
 #            logger.critical(stringURL)
             if write_path is not None:
