@@ -109,7 +109,11 @@ class TuristiPerCaso(Parser):
         return True
 
     def unescape_and_iter(self, text):
-    #        unescape old links
+        """
+        unescape ancient links
+        """
+        from bs4 import BeautifulSoup
+
         html = self.html_parser.unescape(text)
         soup = BeautifulSoup(html, "lxml")
         for a in soup.find_all('a'):
