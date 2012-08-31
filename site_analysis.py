@@ -487,10 +487,10 @@ def gen_hash(*args, **kwargs):
 def get(url, timeout=30, _counter=[0], **kwargs):
     import lz4
 
-    if _counter[0] > 200:
-        exit()
-
-    _counter[0] += 1
+#    if _counter[0] > 200:
+#        exit()
+#
+#    _counter[0] += 1
 
     logger.warning('Getting url %s', url)
     # hash request
