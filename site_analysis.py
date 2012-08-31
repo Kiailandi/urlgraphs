@@ -311,14 +311,11 @@ class VBulletin_Section(Parser):
     def match(self, url):
     #   found if is a VBulletin section
         logger.info('Check VBulletin section rules of the site: %s', url)
-        section_soup = get_soup_from_url(url)
-        html = section_soup.find('html')
-        if html is not None:
-            f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
-            if html.get('id') == 'vbulletin_html' and f_section is not None:
+        doc = get_lxml_doc_from_url(url)
+        if doc is not None:
+            f_section = doc.cssselect('div#threadlist.threadlist')
+            if doc.attrib.get('id') == 'vbulletin_html' and f_section:
                 return True
-        else:
-            return False
 
         return False
 
@@ -395,15 +392,11 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
         find if it's a VBulletin topic
         """
         logger.info('Check VBulletin topic rules of the site: %s', url)
-        topic_soup = get_soup_from_url(url)
-        html = topic_soup.find('html')
-        if html is not None:
-            f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
-            #        try: # is possible html.get('id') == None
-            if html.get('id') == 'vbulletin_html' and f_topic is not None:
+        doc = get_lxml_doc_from_url(url)
+        if doc is not None:
+            f_topic = doc.cssselect('div#postlist.postlist.restrain')
+            if doc.attrib.get('id') == 'vbulletin_html' and f_topic:
                 return True
-                #        except:
-                #            return False
 
         return False
 
