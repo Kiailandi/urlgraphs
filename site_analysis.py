@@ -72,13 +72,8 @@ class File(object):
             self.n_alias += 1
 
 
-def get_soup_from_url(url, _cache=OrderedDict(), _counter=[0]):
+def get_soup_from_url(url, _cache=OrderedDict()):
     logger.warning('Getting soup')
-
-    if _counter[0] > 20:
-        exit()
-
-    _counter[0] += 1
 
     hash_ = hash(url)
     try:
