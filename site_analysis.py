@@ -6,7 +6,6 @@ from xml.etree import cElementTree as etree
 from collections import defaultdict, OrderedDict, deque
 from optparse import OptionParser
 from urlparse import urlparse
-from bz2 import BZ2File
 #import pdb
 import HTMLParser
 
@@ -18,7 +17,7 @@ logger = logging.getLogger('debug_application')
 logger.setLevel(logging.DEBUG)
 # file handler
 fdh = logging.FileHandler('debug.log')
-fdh.setLevel(logging.WARNING)
+fdh.setLevel(logging.ERROR)
 file_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fdh.setFormatter(file_log_formatter)
 # console handler
@@ -33,8 +32,8 @@ logger.addHandler(cwh)
 # cache path
 PROJECT_PATH = os.path.dirname(__file__)
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '.cache')
-THREADED = True
-WORKERS = 20
+THREADED = False
+WORKERS = 4
 
 
 try:
@@ -73,8 +72,14 @@ class File(object):
             self.n_alias += 1
 
 
-def get_soup_from_url(url, _cache=OrderedDict()):
+def get_soup_from_url(url, _cache=OrderedDict(), _counter=[0]):
     logger.warning('Getting soup')
+
+    if _counter[0] > 20:
+        exit()
+
+    _counter[0] += 1
+
     hash_ = hash(url)
     try:
         return _cache[hash_]
@@ -418,22 +423,15 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
 
 
 class GenericLink(Parser):
-
-# DELETE
-# ----- inizialization -----
-
+    """
+    Diffbot
+    """
     defpath = 'http://www.diffbot.com/api/frontpage'
-
     s_token = '22df3421e2ecce206e95c4e68b44b9aa'
 
-    # ------------------------
-    # DELETE
-
-    # diffbot's analysis
     def match(self, url):
         return True
 
-    # list of link by diffbot
     def run(self, url):
         logger.info('Run Diffbot on site: %s', url)
         try:
@@ -456,7 +454,6 @@ class AlLink(Parser):
     def match(self, url):
         return True
 
-    # list of link
     def run(self, url):
         logger.info('Run AlLink on site: %s', url)
         text_soup = get_soup_from_url(url)
@@ -477,10 +474,12 @@ def gen_hash(*args, **kwargs):
 
 
 def get(url, timeout=30, **kwargs):
+    import lz4
+
     logger.warning('Getting url %s', url)
     # hash request
     hash_ = gen_hash(url, kwargs)
-    filename = os.path.join(CACHE_PATH, hash_) + '.bz2'
+    filename = os.path.join(CACHE_PATH, hash_) + '.lz4'
 
     if THREADED:
         import time
@@ -502,9 +501,9 @@ def get(url, timeout=30, **kwargs):
 
     # search in cache
     try:
-        with BZ2File(filename, 'rb') as f:
+        with open(filename, 'rb') as f:
             logger.info('Found in cache: %s', url)
-            content = f.read().decode('utf-8')
+            content = lz4.decompress(f.read()).decode('utf-8')
             if THREADED:
                 # release the lock
                 red.delete(lock)
@@ -517,8 +516,8 @@ def get(url, timeout=30, **kwargs):
 
     text = requests.get(url, timeout=timeout, **kwargs).text
     # store in cache
-    with BZ2File(filename, 'wb', compresslevel=1) as f:
-        f.write(text.encode('utf-8'))
+    with open(filename, 'wb') as f:
+        f.write(lz4.compress(text.encode('utf-8')))
 
     if THREADED:
         # release the lock
