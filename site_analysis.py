@@ -2,7 +2,7 @@ from itertools import chain
 import re
 import os
 import logging
-from xml.etree import cElementTree as etree
+from lxml import etree
 from collections import defaultdict, OrderedDict, deque
 from optparse import OptionParser
 from urlparse import urlparse
