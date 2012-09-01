@@ -29,7 +29,7 @@ CACHE_PATH = os.environ.get(
     'CACHE_PATH',
     os.path.join(os.path.dirname(__file__), '.cache')
 )
-THREADED = False
+#THREADED = False
 WORKERS = 2
 
 
