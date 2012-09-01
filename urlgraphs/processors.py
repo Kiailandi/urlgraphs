@@ -39,9 +39,9 @@ class Processor(object):
         if __TuristiPerCaso:
             self.site.register(parsers.TuristiPerCaso(timeout))
         if __GenericLink:
-            self.site.register(parsers.GenericLink(timeout))
+            self.site.register(parsers.DiffbotParser(timeout))
         if __AlLink:
-            self.site.register(parsers.AlLink(timeout))
+            self.site.register(parsers.EveryLinkParser(timeout))
 
         #        if THREADED:
         #            from Queue import Queue

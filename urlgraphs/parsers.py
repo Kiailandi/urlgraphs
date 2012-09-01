@@ -1,11 +1,12 @@
 import re
 from itertools import chain
+from collections import OrderedDict
 
 import requests
 from lxml import etree
 
 from urlgraphs import logger
-from urlgraphs.helpers import get_soup_from_url, get
+from urlgraphs.helpers import get
 
 
 class Parser(object):
@@ -20,10 +21,26 @@ class Parser(object):
             return self.regex.match(url)
         return False
 
+    @staticmethod
+    def get_soup_from_url(url, _cache=OrderedDict()):
+        from bs4 import BeautifulSoup
+        logger.warning('Getting soup')
+
+        hash_ = hash(url)
+        try:
+            return _cache[hash_]
+        except KeyError:
+            page = get(url)
+            soup = BeautifulSoup(page, "lxml")
+            _cache[hash_] = soup
+            if len(_cache) > 100:
+                _cache.popitem(last=False)
+            return soup
+
 
 class YahooAnswer(Parser):
     def yahoo_page_parser(self, url):
-        page_soup = get_soup_from_url(url)
+        page_soup = self.get_soup_from_url(url)
         # section
         thread_topics = page_soup.find('ul', {"class": "questions"})
         # topic and section
@@ -132,7 +149,7 @@ class TuristiPerCaso(Parser):
     def run(self, url, with_user=False):
     #        run TuristiPerCaso rules
         logger.info('Run TuristiPerCaso rules of the site: %s', url)
-        text_soup = get_soup_from_url(url)
+        text_soup = self.get_soup_from_url(url)
         f_section = text_soup.find('ol', {"class": "thread"})
         if f_section is not None:
             a_list = chain.from_iterable(
@@ -199,7 +216,7 @@ class VBulletin_Section(Parser):
     def match(self, url):
     #   found if is a VBulletin section
         logger.info('Check VBulletin section rules of the site: %s', url)
-        section_soup = get_soup_from_url(url)
+        section_soup = self.get_soup_from_url(url)
         html = section_soup.find('html')
         if html is not None:
             f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
@@ -237,7 +254,7 @@ class VBulletin_Section(Parser):
     def run(self, url):
     #   start VBulletin rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        text_soup = get_soup_from_url(url)
+        text_soup = self.get_soup_from_url(url)
         div_lists = text_soup.find_all('div', {"class": "inner"}) # type list
         for a in self.find_section_pagination(text_soup):
             yield a
@@ -283,7 +300,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
         find if it's a VBulletin topic
         """
         logger.info('Check VBulletin topic rules of the site: %s', url)
-        topic_soup = get_soup_from_url(url)
+        topic_soup = self.get_soup_from_url(url)
         html = topic_soup.find('html')
         if html is not None:
             f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
@@ -314,14 +331,14 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
     def run(self, url):
     #        run VBulletin section rules
         logger.info('Run VBulletin section rules of the site: %s', url)
-        text_soup = get_soup_from_url(url)
+        text_soup = self.get_soup_from_url(url)
         for page_link in self.messages_url(text_soup):
             yield page_link
         for pages in self.found_pages(text_soup):
             yield pages
 
 
-class GenericLink(Parser):
+class DiffbotParser(Parser):
     """
     Diffbot
     """
@@ -348,14 +365,16 @@ class GenericLink(Parser):
             return
 
 
-class AlLink(Parser):
-#    Anlysis on all link of the site
+class EveryLinkParser(Parser):
+    """
+    Extract every link
+    """
     def match(self, url):
         return True
 
     def run(self, url):
-        logger.info('Run AlLink on site: %s', url)
-        text_soup = get_soup_from_url(url)
+        logger.info('Run EveryLinkParser on site: %s', url)
+        text_soup = self.get_soup_from_url(url)
         a_lists = text_soup.find_all('a') # a list
         for a in a_lists:
             yield a.get('href')

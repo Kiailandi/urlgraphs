@@ -1,8 +1,6 @@
 import os
-from collections import OrderedDict
 
 import requests
-from bs4 import BeautifulSoup
 
 from urlgraphs import logger, CACHE_PATH
 
@@ -73,34 +71,3 @@ def get(url, timeout=30, _counter=[0], **kwargs):
 #        red.delete(lock)
 
     return text
-
-
-def get_soup_from_url(url, _cache=OrderedDict()):
-    logger.warning('Getting soup')
-
-    hash_ = hash(url)
-    try:
-        return _cache[hash_]
-    except KeyError:
-        page = get(url)
-        soup = BeautifulSoup(page, "lxml")
-        _cache[hash_] = soup
-        if len(_cache) > 100:
-            _cache.popitem(last=False)
-        return soup
-
-
-def get_lxml_doc_from_url(url, _cache=OrderedDict()):
-    from lxml.html import document_fromstring
-    logger.warning('Getting lxml doc')
-
-    hash_ = hash(url)
-    try:
-        return _cache[hash_]
-    except KeyError:
-        page = get(url)
-        soup = document_fromstring(page)
-        _cache[hash_] = soup
-        if len(_cache) > 100:
-            _cache.popitem(last=False)
-        return soup
