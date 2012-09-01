@@ -138,7 +138,7 @@ class TestVBulletinTopic(unittest.TestCase):
         text_soup = BeautifulSoup(requests.get(
             'http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html').text
                                   , "lxml")
-        self.assertEqual(len(list(self.vbt.found_pages(text_soup))), 9)
+        self.assertEqual(len(list(self.vbt.find_pages(text_soup))), 9)
         self.assertEqual(len(list(self.vbt.messages_url(text_soup))), 9)
         self.assertEqual(len(list(self.vbt.run(
             'http://www.ilgiramondo.net/forum/trentino-alto-adige/15753-trentino-alto-adige.html')))
@@ -177,11 +177,11 @@ class TestTuristiPerCaso(unittest.TestCase):
         grecia_soup = BeautifulSoup(requests.get(
             'http://turistipercaso.it/forum/t/71583/isole-della-grecia.html').text
                                     , "lxml")
-        self.assertEqual(len(list(self.tpc.found_paginator(grecia_soup))), 6)
+        self.assertEqual(len(list(self.tpc.find_paginator(grecia_soup))), 6)
         messico_soup = BeautifulSoup(requests.get(
             'http://turistipercaso.it/forum/t/194776/holbox-messico.html').text
                                      , "lxml")
-        self.assertEqual(len(list(self.tpc.found_paginator(messico_soup))), 0)
+        self.assertEqual(len(list(self.tpc.find_paginator(messico_soup))), 0)
         self.assertEqual(len(list(self.tpc.run(
             'http://turistipercaso.it/forum/t/71583/isole-della-grecia.html')))
                          , len(list(self.tpc.run(

@@ -1,5 +1,7 @@
 import os
+from hashlib import md5
 
+from ujson import dumps
 import requests
 
 from urlgraphs import logger, CACHE_PATH
@@ -10,9 +12,7 @@ def gen_hash(*args, **kwargs):
     hash file generator (for caching)
     """
 
-    import cPickle as pickle
-
-    return str(abs(hash(pickle.dumps((args, kwargs)))))
+    return md5(dumps((args, kwargs))).hexdigest()
 
 
 def get(url, timeout=30, _counter=[0], **kwargs):

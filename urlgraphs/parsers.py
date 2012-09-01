@@ -137,9 +137,11 @@ class TuristiPerCaso(Parser):
             if self.a_valid(a):
                 yield a['href']
 
-    def found_paginator(self, text_soup):
-    #        found URL pagination
-    #        <div class="paginator" ... >
+    def find_paginator(self, text_soup):
+        """
+        Find the urls in the pagination
+        """
+        # <div class="paginator" ... >
         page_div = text_soup.find('div', {'class': 'paginator'})
         if page_div is not None:
             ol = page_div.find('ol', {'class': 'center'})
@@ -178,7 +180,7 @@ class TuristiPerCaso(Parser):
                         yield found_url
                         #            run paginator
 
-            for a_page in self.found_paginator(text_soup):
+            for a_page in self.find_paginator(text_soup):
                 yield a_page
         else:
             return
@@ -214,22 +216,24 @@ class VBulletin_Section(Parser):
     """
 
     def match(self, url):
-    #   found if is a VBulletin section
+        """
+        find if it's a VBulletin section
+        """
         logger.info('Check VBulletin section rules of the site: %s', url)
         section_soup = self.get_soup_from_url(url)
         html = section_soup.find('html')
-        if html is not None:
-            f_section = section_soup.find('div', {"id": "threadlist"}, {"class": "threadlist"})
+        if html:
+            f_section = section_soup.find(
+                'div', {"id": "threadlist"}, {"class": "threadlist"}
+            )
             if html.get('id') == 'vbulletin_html' and f_section is not None:
                 return True
-        else:
-            return False
 
         return False
 
     def find_topic_url(self, div):
         """
-        find how many topic compose this forum section
+        find the topics that compose this forum section
         """
         for topic in div.find_all('a', {"class": "title"}):
             yield topic.get('href')
@@ -302,7 +306,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
         logger.info('Check VBulletin topic rules of the site: %s', url)
         topic_soup = self.get_soup_from_url(url)
         html = topic_soup.find('html')
-        if html is not None:
+        if html:
             f_topic = topic_soup.find('div', {"id": "postlist"}, {"class": "postlist restrain"})
             #        try: # is possible html.get('id') == None
             if html.get('id') == 'vbulletin_html' and f_topic is not None:
@@ -312,16 +316,20 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
 
         return False
 
-    def found_pages(self, text_soup):
-    #   found by how many pages is composed the topic
-    #   <div id="pagination_top" class="pagination_top">
+    def find_pages(self, text_soup):
+        """
+        find the pages that compose the topic
+        """
+        #   <div id="pagination_top" class="pagination_top">
         div_lists = text_soup.find('div', {'id': 'pagination_top'}, {'class': 'pagination_top'})
         for a in div_lists.find_all('a'):
             if a.get('href'):
                 yield a.get('href')
 
     def messages_url(self, text_soup):
-    #   found URL in users' messages
+        """
+        find URL in users' messages
+        """
         div_lists = text_soup.find_all('div', {"class": "content"}) # type list
         for div in div_lists:
             for a in div.find_all('a'):
@@ -334,7 +342,7 @@ rel="nofollow" href="http://www.eden-hotel.com" target="_blank">www.eden-hotel.c
         text_soup = self.get_soup_from_url(url)
         for page_link in self.messages_url(text_soup):
             yield page_link
-        for pages in self.found_pages(text_soup):
+        for pages in self.find_pages(text_soup):
             yield pages
 
 
