@@ -226,7 +226,7 @@ class Tsm(object):
             for dest, weight in grouped_dests.iteritems():
                 dest_idx = index.index(dest)
 
-                graph.add_edge(source_idx, dest_idx)
+                graph.add_edges((source_idx, dest_idx))
                 eid = graph.get_eid(source_idx, dest_idx, directed=True)
                 graph.es[eid]['weight'] = weight
 
