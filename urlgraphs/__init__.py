@@ -231,7 +231,7 @@ class Tsm(object):
                 graph.es[eid]['weight'] = weight
 
 #        with open(, 'wb') as f:
-        graph.write_graphmlz('output.graphmlz')
+        graph.write_graphml('output.graphml')
 
     def close(self):
         from collections import defaultdict

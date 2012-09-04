@@ -14,5 +14,3 @@ class Library(object):
         for urlParser in self.urlDefRegistry:
             if urlParser.match(url):
                 return urlParser
-
-
