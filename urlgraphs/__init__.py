@@ -127,6 +127,12 @@ class Tsm(object):
             action="store_true",
             default=False,
         )
+        parser_.add_option(
+            '--format', dest="format", default="graphml",
+            help="Specify an output format. Choose between dl and graphml. "
+                "Default: graphml",
+            action="store",
+        )
 
         (options, args) = parser_.parse_args()
 
@@ -145,11 +151,15 @@ class Tsm(object):
         else:
             depth_root = int(options.depth)
 
+        if options.format not in ('graphml', 'dl'):
+            raise TypeError('Unknown format')
+
         self.output_path = options.output
         self.alias_path = options.alias
         self.input_path = args[0]
         self.use_hostnames = options.use_hostnames
         self.max_depth = depth_root
+        self.format = options.format
 
     def run(self):
         from urlgraphs.processors import Processor
@@ -185,6 +195,44 @@ class Tsm(object):
     def elaborate_edges(self, source, dests):
         self.edges[source] = dests
 
+    def write_dl(self, index):
+        if self.alias_path:
+            for i, site in enumerate(index):
+                self.file.write_alias(i, site)
+
+        for source, dests in self.edges.iteritems():
+            self.file.write_on_file(
+                'N{0}  '.format(index.index(source))
+            )
+            self.file.write_on_file(
+                '  '.join([
+                'N{0}'.format(index.index(dest))
+                for dest in dests
+                ])
+            )
+            self.file.write_on_file('\r\n')
+            self.file.write_on_file('\r\n')
+
+    def write_graphml(self, index):
+        import igraph as ig
+        from collections import Counter
+
+        graph = ig.Graph(n=len(index), directed=True)
+        graph.vs['url'] = index
+
+        for source, dests in self.edges.iteritems():
+            source_idx = index.index(source)
+            grouped_dests = Counter(dests)
+            for dest, weight in grouped_dests.iteritems():
+                dest_idx = index.index(dest)
+
+                graph.add_edge(source_idx, dest_idx)
+                eid = graph.get_eid(source_idx, dest_idx, directed=True)
+                graph.es[eid]['weight'] = weight
+
+#        with open(, 'wb') as f:
+        graph.write_graphmlz('output.graphmlz')
+
     def close(self):
         from collections import defaultdict
 
@@ -211,22 +259,10 @@ class Tsm(object):
         else:
             index = self.process.linklist
 
-        if self.alias_path:
-            for i, site in enumerate(index):
-                self.file.write_alias(i, site)
-
-        for source, dests in self.edges.iteritems():
-            self.file.write_on_file(
-                'N{0}  '.format(index.index(source))
-            )
-            self.file.write_on_file(
-                '  '.join([
-                    'N{0}'.format(index.index(dest))
-                    for dest in dests
-                ])
-            )
-            self.file.write_on_file('\r\n')
-            self.file.write_on_file('\r\n')
+        if self.format == 'dl':
+            self.write_dl(index)
+        elif self.format == 'graphml':
+            self.write_graphml(index)
 
 
 if __name__ == "__main__":
