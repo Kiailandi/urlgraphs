@@ -13,5 +13,5 @@ pyrepl==0.8.4
 redis==2.4.13
 requests==0.13.9
 rsa==3.0.1
-tablib==0.9.11
+tablib==0.11.5
 wmctrl==0.1
